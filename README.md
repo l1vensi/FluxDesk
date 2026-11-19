@@ -32,6 +32,11 @@ cd FluxDesk\src
 dotnet build FluxDesk.sln -c Release
 ```
 
+## Contributors
+
+- [l1vensi](https://github.com/l1vensi) — Author & Lead Developer
+- [gemini-code-assist](https://github.com/apps/gemini-code-assist) — Co-author & AI Pair Programmer
+
 ## License
 
 This software is released under open-source terms. See the LICENSE file for details.
