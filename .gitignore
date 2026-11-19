@@ -1,0 +1,28 @@
+## Visual Studio & .NET
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+.vs/
+*.user
+*.userosscache
+*.suo
+*.userprefs
+*.tmp
+
+## Single-file publish output
+publish/
+publish_single/
+
+## Windows OS files
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+## Rider & JetBrains
+.idea/
+*.sln.iml
+
+## Release archive
+release/
+staging/
