@@ -16,6 +16,7 @@ namespace WorkSpace
         public string Name { get; set; } = "";
         public string Path { get; set; } = "";
         public string WallpaperPath { get; set; } = "";
+        public string WallpaperEngineItem { get; set; } = "";
     }
 
     public class ScheduleRule
@@ -54,6 +55,9 @@ namespace WorkSpace
         public bool ContextMenuIntegration { get; set; } = false;
         public bool ShowTrayIcon { get; set; } = true;
         public bool QuickSwitcherEnabled { get; set; } = true;
+        public bool ShowPreviewIcons { get; set; } = true;
+        public bool WallpaperEngineEnabled { get; set; } = false;
+        public string WallpaperEngineExe { get; set; } = "";
         public bool HotkeysEnabled { get; set; } = true;
         public string HotkeyModifier { get; set; } = "Alt";
         public Dictionary<string, int> DesktopHotkeys { get; set; } = new Dictionary<string, int>();
@@ -123,6 +127,113 @@ namespace WorkSpace
                 if (File.Exists(path)) return path;
             }
             return null;
+        }
+
+        public static string DetectWallpaperEnginePath()
+        {
+            // 1. Check active processes
+            try
+            {
+                var procs = System.Diagnostics.Process.GetProcessesByName("wallpaper64");
+                if (procs.Length == 0) procs = System.Diagnostics.Process.GetProcessesByName("wallpaper32");
+                if (procs.Length > 0)
+                {
+                    string? p = null;
+                    try { p = procs[0].MainModule?.FileName; } catch { }
+                    if (!string.IsNullOrEmpty(p) && File.Exists(p)) return p;
+                }
+            }
+            catch { }
+
+            // 2. Check Steam registry HKCU\Software\Valve\Steam\SteamPath
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(@"Software\Valve\Steam");
+                if (key?.GetValue("SteamPath") is string steamPath && !string.IsNullOrWhiteSpace(steamPath))
+                {
+                    string norm = steamPath.Replace('/', '\\');
+                    string c64 = Path.Combine(norm, "steamapps", "common", "wallpaper_engine", "wallpaper64.exe");
+                    if (File.Exists(c64)) return c64;
+                    string c32 = Path.Combine(norm, "steamapps", "common", "wallpaper_engine", "wallpaper32.exe");
+                    if (File.Exists(c32)) return c32;
+                }
+            }
+            catch { }
+
+            // 3. Check Steam App 431960 uninstall registry
+            try
+            {
+                using var key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Steam App 431960");
+                if (key?.GetValue("InstallLocation") is string installLoc && !string.IsNullOrWhiteSpace(installLoc))
+                {
+                    string c64 = Path.Combine(installLoc, "wallpaper64.exe");
+                    if (File.Exists(c64)) return c64;
+                    string c32 = Path.Combine(installLoc, "wallpaper32.exe");
+                    if (File.Exists(c32)) return c32;
+                }
+            }
+            catch { }
+
+            // 4. Check common file locations
+            string[] standardDrives = { "C", "D", "E", "F", "G" };
+            foreach (var d in standardDrives)
+            {
+                string[] paths =
+                {
+                    $@"{d}:\Program Files (x86)\Steam\steamapps\common\wallpaper_engine\wallpaper64.exe",
+                    $@"{d}:\Program Files\Steam\steamapps\common\wallpaper_engine\wallpaper64.exe",
+                    $@"{d}:\Steam\steamapps\common\wallpaper_engine\wallpaper64.exe",
+                    $@"{d}:\SteamLibrary\steamapps\common\wallpaper_engine\wallpaper64.exe",
+                    $@"{d}:\Program Files (x86)\Steam\steamapps\common\wallpaper_engine\wallpaper32.exe",
+                    $@"{d}:\Program Files\Steam\steamapps\common\wallpaper_engine\wallpaper32.exe",
+                    $@"{d}:\Steam\steamapps\common\wallpaper_engine\wallpaper32.exe",
+                    $@"{d}:\SteamLibrary\steamapps\common\wallpaper_engine\wallpaper32.exe"
+                };
+                foreach (var p in paths)
+                {
+                    if (File.Exists(p)) return p;
+                }
+            }
+
+            return "";
+        }
+
+        public static string GetWallpaperEngineWorkshopDir(string? exePath = null)
+        {
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(exePath) && File.Exists(exePath))
+                {
+                    string? dir = Path.GetDirectoryName(exePath);
+                    if (!string.IsNullOrEmpty(dir))
+                    {
+                        // From steamapps\common\wallpaper_engine -> steamapps\workshop\content\431960
+                        string candidate = Path.GetFullPath(Path.Combine(dir, "..", "..", "workshop", "content", "431960"));
+                        if (Directory.Exists(candidate)) return candidate;
+                    }
+                }
+
+                // Check via SteamPath
+                using var key = Registry.CurrentUser.OpenSubKey(@"Software\Valve\Steam");
+                if (key?.GetValue("SteamPath") is string steamPath && !string.IsNullOrWhiteSpace(steamPath))
+                {
+                    string candidate = Path.Combine(steamPath.Replace('/', '\\'), "steamapps", "workshop", "content", "431960");
+                    if (Directory.Exists(candidate)) return candidate;
+                }
+
+                string[] standardDrives = { "C", "D", "E", "F", "G" };
+                foreach (var d in standardDrives)
+                {
+                    string candidate = $@"{d}:\Program Files (x86)\Steam\steamapps\workshop\content\431960";
+                    if (Directory.Exists(candidate)) return candidate;
+                    candidate = $@"{d}:\Steam\steamapps\workshop\content\431960";
+                    if (Directory.Exists(candidate)) return candidate;
+                    candidate = $@"{d}:\SteamLibrary\steamapps\workshop\content\431960";
+                    if (Directory.Exists(candidate)) return candidate;
+                }
+            }
+            catch { }
+            return "";
         }
 
         public static string GetUniqueDesktopPath(List<DesktopInfo> existing, string prefix, out string finalName)

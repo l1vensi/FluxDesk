@@ -69,8 +69,10 @@ namespace WorkSpace
             public string DesktopId = "";
             public string DesktopPath = "";
             public string WallpaperPath = "";
+            public string WallpaperEngineItem = "";
             public string DefaultWallpaperPath = "";
             public bool IndependentWallpapers;
+            public bool ShowPreviewIcons = true;
             public List<IconPosition>? LiveIcons;
         }
 
@@ -135,7 +137,7 @@ namespace WorkSpace
             catch { }
         }
 
-        public static void QueueRender(DesktopInfo desktop, bool independentWallpapers, string? defaultWallpaperPath = null, List<IconPosition>? liveIcons = null)
+        public static void QueueRender(DesktopInfo desktop, bool independentWallpapers, string? defaultWallpaperPath = null, List<IconPosition>? liveIcons = null, bool showPreviewIcons = true)
         {
             if (_shuttingDown || desktop == null || !AppConfig.IsSafeId(desktop.Id)) return;
 
@@ -144,8 +146,10 @@ namespace WorkSpace
                 DesktopId = desktop.Id,
                 DesktopPath = desktop.Path ?? "",
                 WallpaperPath = desktop.WallpaperPath ?? "",
+                WallpaperEngineItem = desktop.WallpaperEngineItem ?? "",
                 DefaultWallpaperPath = defaultWallpaperPath ?? "",
                 IndependentWallpapers = independentWallpapers,
+                ShowPreviewIcons = showPreviewIcons,
                 LiveIcons = liveIcons != null ? new List<IconPosition>(liveIcons) : null
             };
 
@@ -174,7 +178,7 @@ namespace WorkSpace
             foreach (var d in config.Desktops)
             {
                 bool isActive = !string.IsNullOrEmpty(activeDesktopId) && d.Id == activeDesktopId;
-                QueueRender(d, config.IndependentWallpapers, config.DefaultWallpaperPath, isActive ? activeLiveIcons : null);
+                QueueRender(d, config.IndependentWallpapers, config.DefaultWallpaperPath, isActive ? activeLiveIcons : null, config.ShowPreviewIcons);
             }
         }
 
@@ -280,80 +284,91 @@ namespace WorkSpace
                 {
                     wpPath = job.WallpaperPath;
                 }
-                else if (!string.IsNullOrWhiteSpace(job.DefaultWallpaperPath) && File.Exists(job.DefaultWallpaperPath))
+                else if (!string.IsNullOrWhiteSpace(job.WallpaperEngineItem))
                 {
-                    wpPath = job.DefaultWallpaperPath;
+                    wpPath = FindWallpaperEnginePreview(job.WallpaperEngineItem);
                 }
-                else
+
+                if (string.IsNullOrWhiteSpace(wpPath) || !File.Exists(wpPath))
                 {
-                    string sysWp = ShellHelper.GetCurrentWallpaper();
-                    if (!string.IsNullOrWhiteSpace(sysWp) && File.Exists(sysWp))
+                    if (!string.IsNullOrWhiteSpace(job.DefaultWallpaperPath) && File.Exists(job.DefaultWallpaperPath))
                     {
-                        wpPath = sysWp;
+                        wpPath = job.DefaultWallpaperPath;
+                    }
+                    else
+                    {
+                        string sysWp = ShellHelper.GetCurrentWallpaper();
+                        if (!string.IsNullOrWhiteSpace(sysWp) && File.Exists(sysWp))
+                        {
+                            wpPath = sysWp;
+                        }
                     }
                 }
 
                 DrawWallpaperBackground(g, wpPath);
 
-                // 2. Entry lookup map
-                var entryMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                var desktopOwnEntries = new List<string>();
-                AddDirectoryEntriesToMap(job.DesktopPath, entryMap, desktopOwnEntries);
-
-                string pubDesktop = Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory);
-                if (!string.IsNullOrEmpty(pubDesktop) &&
-                    !string.Equals(pubDesktop.TrimEnd('\\'), job.DesktopPath.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
+                if (job.ShowPreviewIcons)
                 {
-                    AddDirectoryEntriesToMap(pubDesktop, entryMap, null);
-                }
+                    // 2. Entry lookup map
+                    var entryMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    var desktopOwnEntries = new List<string>();
+                    AddDirectoryEntriesToMap(job.DesktopPath, entryMap, desktopOwnEntries);
 
-                // 3. Icons & positions
-                List<IconPosition> iconsToDraw = ResolveIconsForDesktop(job, entryMap, desktopOwnEntries, screen);
-
-                // 4. Render miniature icons
-                float sx = (float)PreviewWidth / screen.Width;
-                float sy = (float)PreviewHeight / screen.Height;
-                int iconSize = Math.Clamp((int)Math.Round(Math.Min(76 * sx, 82 * sy) * 0.78f), 7, 11);
-
-                using var labelShadowBrush = new SolidBrush(Color.FromArgb(145, 0, 0, 0));
-                using var labelBarBrush = new SolidBrush(Color.FromArgb(200, 238, 245, 255));
-
-                foreach (var item in iconsToDraw)
-                {
-                    if (_shuttingDown || IsDeleted(job.DesktopId)) return;
-
-                    if (item.X < screen.Left - 80 || item.X > screen.Right + 40 ||
-                        item.Y < screen.Top - 80 || item.Y > screen.Bottom + 40)
-                        continue;
-
-                    int drawX = Math.Clamp((int)Math.Round((item.X - screen.Left) * sx), 1, PreviewWidth - iconSize - 1);
-                    int drawY = Math.Clamp((int)Math.Round((item.Y - screen.Top) * sy), 1, PreviewHeight - iconSize - 3);
-
-                    Bitmap? iconBmp = ResolveIconBitmap(item.Name, entryMap, out bool shouldDispose);
-                    try
+                    string pubDesktop = Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory);
+                    if (!string.IsNullOrEmpty(pubDesktop) &&
+                        !string.Equals(pubDesktop.TrimEnd('\\'), job.DesktopPath.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
                     {
-                        if (iconBmp != null)
-                        {
-                            g.DrawImage(iconBmp, new Rectangle(drawX, drawY, iconSize, iconSize));
-                        }
-                        else
-                        {
-                            using var fallbackBrush = new SolidBrush(Color.FromArgb(220, 190, 230, 253));
-                            g.FillRectangle(fallbackBrush, drawX + 1, drawY + 1, iconSize - 2, iconSize - 2);
-                        }
-
-                        int barW = Math.Max(4, iconSize - 2);
-                        int barX = drawX + (iconSize - barW) / 2;
-                        int barY = drawY + iconSize + 1;
-                        if (barY < PreviewHeight - 1)
-                        {
-                            g.FillRectangle(labelShadowBrush, barX, barY + 1, barW, 1);
-                            g.FillRectangle(labelBarBrush, barX, barY, barW, 1);
-                        }
+                        AddDirectoryEntriesToMap(pubDesktop, entryMap, null);
                     }
-                    finally
+
+                    // 3. Icons & positions
+                    List<IconPosition> iconsToDraw = ResolveIconsForDesktop(job, entryMap, desktopOwnEntries, screen);
+
+                    // 4. Render miniature icons
+                    float sx = (float)PreviewWidth / screen.Width;
+                    float sy = (float)PreviewHeight / screen.Height;
+                    int iconSize = Math.Clamp((int)Math.Round(Math.Min(76 * sx, 82 * sy) * 0.78f), 7, 11);
+
+                    using var labelShadowBrush = new SolidBrush(Color.FromArgb(145, 0, 0, 0));
+                    using var labelBarBrush = new SolidBrush(Color.FromArgb(200, 238, 245, 255));
+
+                    foreach (var item in iconsToDraw)
                     {
-                        if (shouldDispose) iconBmp?.Dispose();
+                        if (_shuttingDown || IsDeleted(job.DesktopId)) return;
+
+                        if (item.X < screen.Left - 80 || item.X > screen.Right + 40 ||
+                            item.Y < screen.Top - 80 || item.Y > screen.Bottom + 40)
+                            continue;
+
+                        int drawX = Math.Clamp((int)Math.Round((item.X - screen.Left) * sx), 1, PreviewWidth - iconSize - 1);
+                        int drawY = Math.Clamp((int)Math.Round((item.Y - screen.Top) * sy), 1, PreviewHeight - iconSize - 3);
+
+                        Bitmap? iconBmp = ResolveIconBitmap(item.Name, entryMap, out bool shouldDispose);
+                        try
+                        {
+                            if (iconBmp != null)
+                            {
+                                g.DrawImage(iconBmp, new Rectangle(drawX, drawY, iconSize, iconSize));
+                            }
+                            else
+                            {
+                                using var fallbackBrush = new SolidBrush(Color.FromArgb(220, 190, 230, 253));
+                                g.FillRectangle(fallbackBrush, drawX + 1, drawY + 1, iconSize - 2, iconSize - 2);
+                            }
+
+                            int barW = Math.Max(4, iconSize - 2);
+                            int barX = drawX + (iconSize - barW) / 2;
+                            int barY = drawY + iconSize + 1;
+                            if (barY < PreviewHeight - 1)
+                            {
+                                g.FillRectangle(labelShadowBrush, barX, barY + 1, barW, 1);
+                                g.FillRectangle(labelBarBrush, barX, barY, barW, 1);
+                            }
+                        }
+                        finally
+                        {
+                            if (shouldDispose) iconBmp?.Dispose();
+                        }
                     }
                 }
             }
@@ -733,6 +748,35 @@ namespace WorkSpace
             {
                 DestroyIcon(sii.hIcon);
             }
+        }
+
+        private static string FindWallpaperEnginePreview(string itemPath)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(itemPath)) return "";
+                string? dir = null;
+                if (File.Exists(itemPath))
+                {
+                    dir = Path.GetDirectoryName(itemPath);
+                }
+                else if (Directory.Exists(itemPath))
+                {
+                    dir = itemPath;
+                }
+
+                if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+                {
+                    string[] candidates = { "preview.jpg", "preview.png", "preview.gif", "preview.jpeg", "screenshot.jpg", "screenshot.png" };
+                    foreach (var c in candidates)
+                    {
+                        string p = Path.Combine(dir, c);
+                        if (File.Exists(p)) return p;
+                    }
+                }
+            }
+            catch { }
+            return "";
         }
     }
 }

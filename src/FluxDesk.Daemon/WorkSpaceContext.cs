@@ -643,10 +643,11 @@ namespace WorkSpace
                 ? _config.Desktops[_config.CurrentIndex].Id
                 : "";
             var snapshotDesktops = _config.Desktops
-                .Select(d => new DesktopInfo { Id = d.Id, Name = d.Name, Path = d.Path, WallpaperPath = d.WallpaperPath })
+                .Select(d => new DesktopInfo { Id = d.Id, Name = d.Name, Path = d.Path, WallpaperPath = d.WallpaperPath, WallpaperEngineItem = d.WallpaperEngineItem })
                 .ToList();
             bool indWp = _config.IndependentWallpapers;
             string defWp = _config.DefaultWallpaperPath ?? "";
+            bool showIcons = _config.ShowPreviewIcons;
 
             // Offload GetCurrentIcons() off the UI thread so WH_KEYBOARD_LL and WinForms stay 100% responsive
             Task.Run(() =>
@@ -656,7 +657,7 @@ namespace WorkSpace
                 foreach (var d in snapshotDesktops)
                 {
                     bool isActive = !string.IsNullOrEmpty(activeId) && d.Id == activeId;
-                    DesktopPreviewGenerator.QueueRender(d, indWp, defWp, isActive ? liveIcons : null);
+                    DesktopPreviewGenerator.QueueRender(d, indWp, defWp, isActive ? liveIcons : null, showIcons);
                 }
             });
         }
@@ -826,7 +827,7 @@ namespace WorkSpace
                     }
                     if (prevDesktopObj != null)
                     {
-                        DesktopPreviewGenerator.QueueRender(prevDesktopObj, _config.IndependentWallpapers, _config.DefaultWallpaperPath, curIconsBeforeSwitch);
+                        DesktopPreviewGenerator.QueueRender(prevDesktopObj, _config.IndependentWallpapers, _config.DefaultWallpaperPath, curIconsBeforeSwitch, _config.ShowPreviewIcons);
                     }
                 }
                 else
@@ -877,6 +878,9 @@ namespace WorkSpace
                     }
                 }
 
+                // Apply Wallpaper Engine if enabled
+                ApplyWallpaperEngineAsync(target);
+
                 if (!force)
                 {
                     // Desktop switched
@@ -889,13 +893,15 @@ namespace WorkSpace
                     Id = target.Id,
                     Name = target.Name,
                     Path = target.Path,
-                    WallpaperPath = target.WallpaperPath
+                    WallpaperPath = target.WallpaperPath,
+                    WallpaperEngineItem = target.WallpaperEngineItem
                 };
                 bool indWp = _config.IndependentWallpapers;
                 string defWp = _config.DefaultWallpaperPath ?? "";
+                bool showIcons = _config.ShowPreviewIcons;
                 bool renderAllAfter = isStartup;
                 var allDesktopsSnapshot = isStartup
-                    ? _config.Desktops.Select(d => new DesktopInfo { Id = d.Id, Name = d.Name, Path = d.Path, WallpaperPath = d.WallpaperPath }).ToList()
+                    ? _config.Desktops.Select(d => new DesktopInfo { Id = d.Id, Name = d.Name, Path = d.Path, WallpaperPath = d.WallpaperPath, WallpaperEngineItem = d.WallpaperEngineItem }).ToList()
                     : null;
                 Func<bool> isCancelled = () => IsDisposed || Volatile.Read(ref _switchGeneration) != myGen;
 
@@ -929,7 +935,7 @@ namespace WorkSpace
                         if (isCancelled()) return;
 
                         var freshIcons = IconLayoutManager.GetCurrentIcons();
-                        DesktopPreviewGenerator.QueueRender(targetSnapshot, indWp, defWp, freshIcons);
+                        DesktopPreviewGenerator.QueueRender(targetSnapshot, indWp, defWp, freshIcons, showIcons);
 
                         if (renderAllAfter && allDesktopsSnapshot != null)
                         {
@@ -937,7 +943,7 @@ namespace WorkSpace
                             {
                                 if (d.Id != targetId)
                                 {
-                                    DesktopPreviewGenerator.QueueRender(d, indWp, defWp, null);
+                                    DesktopPreviewGenerator.QueueRender(d, indWp, defWp, null, showIcons);
                                 }
                             }
                         }
@@ -1385,9 +1391,58 @@ namespace WorkSpace
                             ShellHelper.SetWallpaper(primaryWp);
                         }
                     }
+
+                    if (_config.WallpaperEngineEnabled)
+                    {
+                        ApplyWallpaperEngineAsync(_config.Desktops[0]);
+                    }
                 }
             }
             catch { }
+        }
+
+        private void ApplyWallpaperEngineAsync(DesktopInfo target)
+        {
+            if (!_config.WallpaperEngineEnabled) return;
+            string exe = !string.IsNullOrWhiteSpace(_config.WallpaperEngineExe) && File.Exists(_config.WallpaperEngineExe)
+                ? _config.WallpaperEngineExe
+                : AppConfig.DetectWallpaperEnginePath();
+
+            if (string.IsNullOrWhiteSpace(exe) || !File.Exists(exe)) return;
+
+            Task.Run(() =>
+            {
+                try
+                {
+                    if (!string.IsNullOrWhiteSpace(target.WallpaperEngineItem) &&
+                        (File.Exists(target.WallpaperEngineItem) || Directory.Exists(target.WallpaperEngineItem)))
+                    {
+                        var psi = new ProcessStartInfo
+                        {
+                            FileName = exe,
+                            Arguments = $"-control openWallpaper -file \"{target.WallpaperEngineItem}\"",
+                            UseShellExecute = false,
+                            CreateNoWindow = true
+                        };
+                        using var p = Process.Start(psi);
+                    }
+                    else
+                    {
+                        var psi = new ProcessStartInfo
+                        {
+                            FileName = exe,
+                            Arguments = "-control stop",
+                            UseShellExecute = false,
+                            CreateNoWindow = true
+                        };
+                        using var p = Process.Start(psi);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log($"[WallpaperEngine] Switch error: {ex.Message}");
+                }
+            });
         }
 
         private void OnEndSessionMessage(bool actuallyEnding)

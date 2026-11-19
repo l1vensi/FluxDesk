@@ -30,6 +30,7 @@ namespace DeskSpace
         public string Name { get; set; } = "";
         public string Path { get; set; } = "";
         public string WallpaperPath { get; set; } = "";
+        public string WallpaperEngineItem { get; set; } = "";
     }
 
     public class ScheduleRule
@@ -67,6 +68,9 @@ namespace DeskSpace
         public bool ContextMenuIntegration { get; set; } = false;
         public bool ShowTrayIcon { get; set; } = true;
         public bool QuickSwitcherEnabled { get; set; } = true;
+        public bool ShowPreviewIcons { get; set; } = true;
+        public bool WallpaperEngineEnabled { get; set; } = false;
+        public string WallpaperEngineExe { get; set; } = "";
         public bool HotkeysEnabled { get; set; } = true;
         public string HotkeyModifier { get; set; } = "Alt";
         public Dictionary<string, int> DesktopHotkeys { get; set; } = new Dictionary<string, int>();
@@ -126,6 +130,107 @@ namespace DeskSpace
                     return altPath;
                 suffix++;
             }
+        }
+
+        public static string DetectWallpaperEnginePath()
+        {
+            try
+            {
+                var procs = System.Diagnostics.Process.GetProcessesByName("wallpaper64");
+                if (procs.Length == 0) procs = System.Diagnostics.Process.GetProcessesByName("wallpaper32");
+                if (procs.Length > 0)
+                {
+                    string? p = null;
+                    try { p = procs[0].MainModule?.FileName; } catch { }
+                    if (!string.IsNullOrEmpty(p) && File.Exists(p)) return p;
+                }
+            }
+            catch { }
+
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(@"Software\Valve\Steam");
+                if (key?.GetValue("SteamPath") is string steamPath && !string.IsNullOrWhiteSpace(steamPath))
+                {
+                    string norm = steamPath.Replace('/', '\\');
+                    string c64 = System.IO.Path.Combine(norm, "steamapps", "common", "wallpaper_engine", "wallpaper64.exe");
+                    if (File.Exists(c64)) return c64;
+                    string c32 = System.IO.Path.Combine(norm, "steamapps", "common", "wallpaper_engine", "wallpaper32.exe");
+                    if (File.Exists(c32)) return c32;
+                }
+            }
+            catch { }
+
+            try
+            {
+                using var key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Steam App 431960");
+                if (key?.GetValue("InstallLocation") is string installLoc && !string.IsNullOrWhiteSpace(installLoc))
+                {
+                    string c64 = System.IO.Path.Combine(installLoc, "wallpaper64.exe");
+                    if (File.Exists(c64)) return c64;
+                    string c32 = System.IO.Path.Combine(installLoc, "wallpaper32.exe");
+                    if (File.Exists(c32)) return c32;
+                }
+            }
+            catch { }
+
+            string[] standardDrives = { "C", "D", "E", "F", "G" };
+            foreach (var d in standardDrives)
+            {
+                string[] paths =
+                {
+                    $@"{d}:\Program Files (x86)\Steam\steamapps\common\wallpaper_engine\wallpaper64.exe",
+                    $@"{d}:\Program Files\Steam\steamapps\common\wallpaper_engine\wallpaper64.exe",
+                    $@"{d}:\Steam\steamapps\common\wallpaper_engine\wallpaper64.exe",
+                    $@"{d}:\SteamLibrary\steamapps\common\wallpaper_engine\wallpaper64.exe",
+                    $@"{d}:\Program Files (x86)\Steam\steamapps\common\wallpaper_engine\wallpaper32.exe",
+                    $@"{d}:\Program Files\Steam\steamapps\common\wallpaper_engine\wallpaper32.exe",
+                    $@"{d}:\Steam\steamapps\common\wallpaper_engine\wallpaper32.exe",
+                    $@"{d}:\SteamLibrary\steamapps\common\wallpaper_engine\wallpaper32.exe"
+                };
+                foreach (var p in paths)
+                {
+                    if (File.Exists(p)) return p;
+                }
+            }
+
+            return "";
+        }
+
+        public static string GetWallpaperEngineWorkshopDir(string? exePath = null)
+        {
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(exePath) && File.Exists(exePath))
+                {
+                    string? dir = System.IO.Path.GetDirectoryName(exePath);
+                    if (!string.IsNullOrEmpty(dir))
+                    {
+                        string candidate = System.IO.Path.GetFullPath(System.IO.Path.Combine(dir, "..", "..", "workshop", "content", "431960"));
+                        if (Directory.Exists(candidate)) return candidate;
+                    }
+                }
+
+                using var key = Registry.CurrentUser.OpenSubKey(@"Software\Valve\Steam");
+                if (key?.GetValue("SteamPath") is string steamPath && !string.IsNullOrWhiteSpace(steamPath))
+                {
+                    string candidate = System.IO.Path.Combine(steamPath.Replace('/', '\\'), "steamapps", "workshop", "content", "431960");
+                    if (Directory.Exists(candidate)) return candidate;
+                }
+
+                string[] standardDrives = { "C", "D", "E", "F", "G" };
+                foreach (var d in standardDrives)
+                {
+                    string candidate = $@"{d}:\Program Files (x86)\Steam\steamapps\workshop\content\431960";
+                    if (Directory.Exists(candidate)) return candidate;
+                    candidate = $@"{d}:\Steam\steamapps\workshop\content\431960";
+                    if (Directory.Exists(candidate)) return candidate;
+                    candidate = $@"{d}:\SteamLibrary\steamapps\workshop\content\431960";
+                    if (Directory.Exists(candidate)) return candidate;
+                }
+            }
+            catch { }
+            return "";
         }
 
         private static T WithConfigMutex<T>(Func<T> action)
@@ -750,6 +855,15 @@ namespace DeskSpace
             ChkStartWithWindows.IsChecked = _config.StartWithWindows;
             ChkRestorePrimaryOnShutdown.IsChecked = _config.RestorePrimaryOnShutdown;
             ChkIndependentWallpapers.IsChecked = _config.IndependentWallpapers;
+            ChkShowPreviewIcons.IsChecked = _config.ShowPreviewIcons;
+            ChkWallpaperEngine.IsChecked = _config.WallpaperEngineEnabled;
+            if (string.IsNullOrWhiteSpace(_config.WallpaperEngineExe))
+            {
+                string detected = AppConfig.DetectWallpaperEnginePath();
+                if (!string.IsNullOrEmpty(detected)) _config.WallpaperEngineExe = detected;
+            }
+            TxtWallpaperEngineExe.Text = _config.WallpaperEngineExe ?? "";
+            UpdateWallpaperEngineStatus();
             ChkContextMenu.IsChecked = _config.ContextMenuIntegration;
             ChkShowTrayIcon.IsChecked = _config.ShowTrayIcon;
             ChkQuickSwitcher.IsChecked = _config.QuickSwitcherEnabled;
@@ -1066,6 +1180,71 @@ namespace DeskSpace
             }
             _config.Save();
             PopulateDesktopCards();
+        }
+
+        private void ChkShowPreviewIcons_Click(object sender, RoutedEventArgs e)
+        {
+            _config.ShowPreviewIcons = (ChkShowPreviewIcons.IsChecked == true);
+            _config.Save();
+            SendIpcCommand("refresh_previews");
+        }
+
+        private void ChkWallpaperEngine_Click(object sender, RoutedEventArgs e)
+        {
+            _config.WallpaperEngineEnabled = (ChkWallpaperEngine.IsChecked == true);
+            if (_config.WallpaperEngineEnabled && string.IsNullOrWhiteSpace(_config.WallpaperEngineExe))
+            {
+                _config.WallpaperEngineExe = AppConfig.DetectWallpaperEnginePath();
+                if (TxtWallpaperEngineExe != null) TxtWallpaperEngineExe.Text = _config.WallpaperEngineExe;
+            }
+            _config.Save();
+            UpdateWallpaperEngineStatus();
+            PopulateDesktopCards();
+        }
+
+        private void TxtWallpaperEngineExe_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (_isInitializing) return;
+            _config.WallpaperEngineExe = TxtWallpaperEngineExe.Text.Trim();
+            _config.Save();
+            UpdateWallpaperEngineStatus();
+        }
+
+        private void BtnBrowseWallpaperEngine_Click(object sender, RoutedEventArgs e)
+        {
+            bool isRu = (_config.Language == "ru");
+            var dlg = new Microsoft.Win32.OpenFileDialog
+            {
+                Title = isRu ? "Выберите wallpaper64.exe" : "Select wallpaper64.exe",
+                Filter = "Wallpaper Engine (wallpaper64.exe;wallpaper32.exe)|wallpaper64.exe;wallpaper32.exe|Все файлы (*.*)|*.*"
+            };
+            if (dlg.ShowDialog() == true && File.Exists(dlg.FileName))
+            {
+                _config.WallpaperEngineExe = dlg.FileName;
+                TxtWallpaperEngineExe.Text = dlg.FileName;
+                _config.Save();
+                UpdateWallpaperEngineStatus();
+            }
+        }
+
+        private void UpdateWallpaperEngineStatus()
+        {
+            if (TxtWeStatus == null) return;
+            bool isRu = (_config.Language == "ru");
+            string path = TxtWallpaperEngineExe?.Text?.Trim() ?? "";
+
+            if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
+            {
+                TxtWeStatus.Text = isRu ? $"Обнаружен: {path}" : $"Found: {path}";
+                TxtWeStatus.Foreground = new SolidColorBrush(Color.FromRgb(34, 197, 94));
+            }
+            else
+            {
+                TxtWeStatus.Text = isRu
+                    ? "Файл не найден. Укажите путь к wallpaper64.exe вручную."
+                    : "Executable not found. Please specify wallpaper64.exe manually.";
+                TxtWeStatus.Foreground = new SolidColorBrush(Color.FromRgb(239, 68, 68));
+            }
         }
 
         private void ChkContextMenu_Click(object sender, RoutedEventArgs e)
@@ -1517,6 +1696,20 @@ namespace DeskSpace
             TxtWpTitle.Text = isRu ? "Раздельные обои для столов" : "Independent Wallpapers";
             TxtWpBadge.Text = isRu ? "ДОСТУПНО" : "INCLUDED";
             TxtWpDesc.Text = isRu ? "Выберите свои обои через меню [...] на карточке любого стола — FluxDesk будет менять их автоматически." : "Pick custom wallpapers via [...] on any desktop card — FluxDesk switches them automatically.";
+
+            TxtPreviewIconsTitle.Text = isRu ? "Значки на превью (Alt+W)" : "Desktop icons on switcher previews";
+            TxtPreviewIconsDesc.Text = isRu
+                ? "Отображать значки рабочих столов на карточках быстрого переключения или показывать только чистые обои."
+                : "Show miniature desktop icons on Alt+W preview cards, or keep cards showing only clean wallpapers.";
+
+            TxtWeTitle.Text = isRu ? "Поддержка Wallpaper Engine" : "Wallpaper Engine Integration";
+            TxtWeBadge.Text = isRu ? "ЖИВЫЕ ОБОИ" : "LIVE";
+            TxtWeDesc.Text = isRu
+                ? "Автоматически запускать и переключать живые обои Wallpaper Engine при смене рабочих столов."
+                : "Automatically switch assigned Wallpaper Engine live wallpapers when switching workspaces.";
+            TxtWePathLabel.Text = isRu ? "Путь к исполняемому файлу (wallpaper64.exe):" : "Executable path (wallpaper64.exe):";
+            TxtBtnBrowseWe.Text = isRu ? "Обзор..." : "Browse...";
+            UpdateWallpaperEngineStatus();
 
             TxtSecSystem.Text = isRu ? "Система" : "System";
             TxtStartupTitle.Text = isRu ? "Автозапуск при входе в систему" : "Launch on startup";
@@ -1986,6 +2179,9 @@ namespace DeskSpace
             _config.RestorePrimaryOnShutdown = true;
             _config.AutoMovePublicDesktopItems = false;
             _config.IndependentWallpapers = false;
+            _config.ShowPreviewIcons = true;
+            _config.WallpaperEngineEnabled = false;
+            _config.WallpaperEngineExe = AppConfig.DetectWallpaperEnginePath();
             _config.ContextMenuIntegration = false;
             _config.ShowTrayIcon = true;
             _config.QuickSwitcherEnabled = true;
@@ -2731,9 +2927,10 @@ namespace DeskSpace
                 infoStack.Children.Add(titleStack);
 
                 bool hasWallpaper = _config.IndependentWallpapers && !string.IsNullOrWhiteSpace(d.WallpaperPath) && File.Exists(d.WallpaperPath);
+                bool hasWe = _config.WallpaperEngineEnabled && !string.IsNullOrWhiteSpace(d.WallpaperEngineItem);
                 string subtitle = isRu
-                    ? ($"Элементов: {itemCount}" + (i == 0 ? " • Основной стол" : "") + (hasWallpaper ? " • Свои обои" : ""))
-                    : ($"Items: {itemCount}" + (i == 0 ? " • OS Default" : "") + (hasWallpaper ? " • Custom wallpaper" : ""));
+                    ? ($"Элементов: {itemCount}" + (i == 0 ? " • Основной стол" : "") + (hasWe ? " • Wallpaper Engine" : (hasWallpaper ? " • Свои обои" : "")))
+                    : ($"Items: {itemCount}" + (i == 0 ? " • OS Default" : "") + (hasWe ? " • Wallpaper Engine" : (hasWallpaper ? " • Custom wallpaper" : "")));
 
                 infoStack.Children.Add(new TextBlock
                 {
@@ -2890,6 +3087,78 @@ namespace DeskSpace
                         PopulateDesktopCards();
                     };
                     cm.Items.Add(miClearWp);
+                }
+
+                // Wallpaper Engine support
+                string weExe = !string.IsNullOrWhiteSpace(_config.WallpaperEngineExe) && File.Exists(_config.WallpaperEngineExe)
+                    ? _config.WallpaperEngineExe
+                    : AppConfig.DetectWallpaperEnginePath();
+                bool weAvailable = !string.IsNullOrWhiteSpace(weExe) || _config.WallpaperEngineEnabled;
+
+                if (weAvailable)
+                {
+                    var miWe = new MenuItem
+                    {
+                        Header = isRu ? "Привязать живые обои (Wallpaper Engine)..." : "Set live wallpaper (Wallpaper Engine)...",
+                        Icon = CreateMenuIcon("IconImage", accentBrush)
+                    };
+                    miWe.Click += (s, e) =>
+                    {
+                        var liveDesk = _config.Desktops.FirstOrDefault(x => x.Id == deskId);
+                        if (liveDesk == null) return;
+
+                        string initialDir = AppConfig.GetWallpaperEngineWorkshopDir(_config.WallpaperEngineExe);
+
+                        var dlg = new Microsoft.Win32.OpenFileDialog
+                        {
+                            Title = isRu ? $"Живые обои для «{liveDesk.Name}»" : $"Live wallpaper for \"{liveDesk.Name}\"",
+                            Filter = isRu
+                                ? "Обои Wallpaper Engine (*.pkg;project.json;*.mp4;*.webm)|*.pkg;project.json;*.mp4;*.webm|Все файлы (*.*)|*.*"
+                                : "Wallpaper Engine Wallpapers (*.pkg;project.json;*.mp4;*.webm)|*.pkg;project.json;*.mp4;*.webm|All files (*.*)|*.*"
+                        };
+                        if (!string.IsNullOrEmpty(initialDir) && Directory.Exists(initialDir))
+                        {
+                            dlg.InitialDirectory = initialDir;
+                        }
+
+                        if (dlg.ShowDialog() == true && File.Exists(dlg.FileName))
+                        {
+                            var freshDesk = _config.Desktops.FirstOrDefault(x => x.Id == deskId);
+                            if (freshDesk == null) return;
+
+                            freshDesk.WallpaperEngineItem = dlg.FileName;
+                            _config.WallpaperEngineEnabled = true;
+                            ChkWallpaperEngine.IsChecked = true;
+                            if (string.IsNullOrWhiteSpace(_config.WallpaperEngineExe))
+                            {
+                                string det = AppConfig.DetectWallpaperEnginePath();
+                                if (!string.IsNullOrEmpty(det)) _config.WallpaperEngineExe = det;
+                            }
+                            _config.Save();
+                            SendIpcCommand("refresh_previews");
+                            PopulateDesktopCards();
+                        }
+                    };
+                    cm.Items.Add(miWe);
+
+                    if (!string.IsNullOrWhiteSpace(d.WallpaperEngineItem))
+                    {
+                        var miClearWe = new MenuItem
+                        {
+                            Header = isRu ? "Убрать живые обои" : "Clear live wallpaper",
+                            Icon = CreateMenuIcon("IconClose", secondaryBrush)
+                        };
+                        miClearWe.Click += (s, e) =>
+                        {
+                            var freshDesk = _config.Desktops.FirstOrDefault(x => x.Id == deskId);
+                            if (freshDesk == null) return;
+                            freshDesk.WallpaperEngineItem = "";
+                            _config.Save();
+                            SendIpcCommand("refresh_previews");
+                            PopulateDesktopCards();
+                        };
+                        cm.Items.Add(miClearWe);
+                    }
                 }
 
                 var miOpen = new MenuItem

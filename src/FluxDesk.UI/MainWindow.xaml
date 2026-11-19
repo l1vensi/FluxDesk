@@ -265,7 +265,7 @@
                                 <!-- 2. Personalization Section -->
                                 <TextBlock x:Name="TxtSecPersonalization" Text="Personalization" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,10"/>
 
-                                <Border Background="{StaticResource CardBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="18" Margin="0,0,0,24">
+                                <Border Background="{StaticResource CardBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="18" Margin="0,0,0,10">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
@@ -281,6 +281,61 @@
                                             <TextBlock x:Name="TxtWpDesc" Text="FluxDesk manages distinct wallpapers per workspace." FontSize="12.5" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,4,0,0"/>
                                         </StackPanel>
                                         <CheckBox x:Name="ChkIndependentWallpapers" Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource ToggleSwitchStyle}" IsChecked="False" Click="ChkIndependentWallpapers_Click"/>
+                                    </Grid>
+                                </Border>
+
+                                <!-- Switcher Preview Icons -->
+                                <Border Background="{StaticResource CardBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="18" Margin="0,0,0,10">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Margin="0,0,16,0">
+                                            <TextBlock x:Name="TxtPreviewIconsTitle" Text="Desktop icons on switcher previews" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                            <TextBlock x:Name="TxtPreviewIconsDesc" Text="Show desktop icons on Alt+W preview cards, or keep cards showing only clean wallpapers." FontSize="12.5" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                        </StackPanel>
+                                        <CheckBox x:Name="ChkShowPreviewIcons" Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource ToggleSwitchStyle}" IsChecked="True" Click="ChkShowPreviewIcons_Click"/>
+                                    </Grid>
+                                </Border>
+
+                                <!-- Wallpaper Engine Integration -->
+                                <Border Background="{StaticResource CardBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="18" Margin="0,0,0,24">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        <Grid Grid.Row="0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Margin="0,0,16,0">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock x:Name="TxtWeTitle" Text="Wallpaper Engine Integration" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                                    <Border Background="{StaticResource AccentTintBrush}" BorderBrush="{StaticResource AccentBorderBrush}" BorderThickness="1" CornerRadius="4" Padding="6,2" Margin="10,0,0,0">
+                                                        <TextBlock x:Name="TxtWeBadge" Text="LIVE" FontSize="9" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
+                                                    </Border>
+                                                </StackPanel>
+                                                <TextBlock x:Name="TxtWeDesc" Text="Automatically switch live wallpapers per workspace when switching." FontSize="12.5" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                            </StackPanel>
+                                            <CheckBox x:Name="ChkWallpaperEngine" Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource ToggleSwitchStyle}" IsChecked="False" Click="ChkWallpaperEngine_Click"/>
+                                        </Grid>
+                                        <StackPanel Grid.Row="1" Margin="0,14,0,0">
+                                            <TextBlock x:Name="TxtWePathLabel" Text="Executable path (wallpaper64.exe):" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,6"/>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBox x:Name="TxtWallpaperEngineExe" Height="36" Padding="10,0" FontSize="12" Background="#161922" BorderBrush="{StaticResource BorderBrush}" Foreground="{StaticResource TextPrimaryBrush}" VerticalContentAlignment="Center" TextChanged="TxtWallpaperEngineExe_TextChanged"/>
+                                                <Button x:Name="BtnBrowseWallpaperEngine" Grid.Column="1" Height="36" Padding="14,0" Margin="10,0,0,0" Style="{StaticResource SecondaryButtonStyle}" Click="BtnBrowseWallpaperEngine_Click">
+                                                    <TextBlock x:Name="TxtBtnBrowseWe" Text="Browse" FontSize="13"/>
+                                                </Button>
+                                            </Grid>
+                                            <TextBlock x:Name="TxtWeStatus" Text="Status" FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,6,0,0"/>
+                                        </StackPanel>
                                     </Grid>
                                 </Border>
 
