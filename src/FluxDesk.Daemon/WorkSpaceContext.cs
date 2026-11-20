@@ -545,10 +545,14 @@ namespace WorkSpace
             string prevActiveId = prevActiveObj?.Id ?? "";
             string prevActivePath = prevActiveObj?.Path ?? "";
             string prevEffectiveWp = prevActiveObj != null ? GetEffectiveWallpaperFor(prevActiveObj) : "";
+            string prevWeItem = prevActiveObj?.WallpaperEngineItem ?? "";
 
             bool prevAutoStart = _config.StartWithWindows;
             bool prevCtxMenu = _config.ContextMenuIntegration;
             bool prevIndWp = _config.IndependentWallpapers;
+            bool prevShowIcons = _config.ShowPreviewIcons;
+            bool prevWeEnabled = _config.WallpaperEngineEnabled;
+            string prevWeExe = _config.WallpaperEngineExe ?? "";
             var prevIds = new HashSet<string>(_config.Desktops.Select(d => d.Id), StringComparer.OrdinalIgnoreCase);
 
             _config.Desktops = newCfg.Desktops;
@@ -562,6 +566,9 @@ namespace WorkSpace
             _config.ContextMenuIntegration = newCfg.ContextMenuIntegration;
             _config.ShowTrayIcon = newCfg.ShowTrayIcon;
             _config.QuickSwitcherEnabled = newCfg.QuickSwitcherEnabled;
+            _config.ShowPreviewIcons = newCfg.ShowPreviewIcons;
+            _config.WallpaperEngineEnabled = newCfg.WallpaperEngineEnabled;
+            _config.WallpaperEngineExe = newCfg.WallpaperEngineExe;
             _config.HotkeysEnabled = newCfg.HotkeysEnabled;
             _config.HotkeyModifier = string.IsNullOrWhiteSpace(newCfg.HotkeyModifier) ? "Alt" : newCfg.HotkeyModifier;
             _config.DesktopHotkeys = newCfg.DesktopHotkeys ?? new Dictionary<string, int>();
@@ -569,6 +576,11 @@ namespace WorkSpace
             _config.Schedules = newCfg.Schedules ?? new List<ScheduleRule>();
             _config.Triggers = newCfg.Triggers ?? new List<SwitchTrigger>();
             _config.IsTransientFallback = false;
+
+            if (prevShowIcons != _config.ShowPreviewIcons)
+            {
+                _switcher.ClearPreviewCache();
+            }
 
             _keyboardHook.UpdateHotkeyMap(_config);
             _trayIcon.Visible = _config.ShowTrayIcon;
@@ -621,10 +633,19 @@ namespace WorkSpace
                     }
                 }
 
+                // Apply live Wallpaper Engine change if active desktop's item changed OR enabled state changed!
+                string curWeItem = curDesktop.WallpaperEngineItem ?? "";
+                if (!string.Equals(prevWeItem, curWeItem, StringComparison.OrdinalIgnoreCase) ||
+                    prevWeEnabled != _config.WallpaperEngineEnabled ||
+                    !string.Equals(prevWeExe, _config.WallpaperEngineExe, StringComparison.OrdinalIgnoreCase))
+                {
+                    ApplyWallpaperEngineAsync(curDesktop);
+                }
+
                 UpdateTrayIcon();
                 UpdateTrayMenu();
                 _switcher.SyncWithConfig();
-                if (!suppressPreviewRefresh)
+                if (!suppressPreviewRefresh || prevShowIcons != _config.ShowPreviewIcons)
                 {
                     RefreshAllPreviewsAsync();
                 }
@@ -1408,20 +1429,67 @@ namespace WorkSpace
 
         private void ApplyWallpaperEngineAsync(DesktopInfo target)
         {
-            if (!_config.WallpaperEngineEnabled) return;
-            string exe = !string.IsNullOrWhiteSpace(_config.WallpaperEngineExe) && File.Exists(_config.WallpaperEngineExe)
-                ? _config.WallpaperEngineExe
-                : AppConfig.DetectWallpaperEnginePath();
+            if (!_config.WallpaperEngineEnabled)
+            {
+                // If disabled while running, stop any active live wallpaper
+                string maybeExe = AppConfig.GetActiveOrConfiguredWallpaperEngineExe(_config.WallpaperEngineExe);
+                if (!string.IsNullOrWhiteSpace(maybeExe) && File.Exists(maybeExe))
+                {
+                    bool isRunning = Process.GetProcessesByName("wallpaper32").Length > 0 ||
+                                     Process.GetProcessesByName("wallpaper64").Length > 0;
+                    if (isRunning)
+                    {
+                        Task.Run(() =>
+                        {
+                            try
+                            {
+                                var psi = new ProcessStartInfo
+                                {
+                                    FileName = maybeExe,
+                                    Arguments = "-control stop",
+                                    UseShellExecute = false,
+                                    CreateNoWindow = true
+                                };
+                                using var p = Process.Start(psi);
+                                p?.WaitForExit(3000);
+                            }
+                            catch { }
+                        });
+                    }
+                }
+                return;
+            }
 
-            if (string.IsNullOrWhiteSpace(exe) || !File.Exists(exe)) return;
+            string exe = AppConfig.GetActiveOrConfiguredWallpaperEngineExe(_config.WallpaperEngineExe);
+            if (string.IsNullOrWhiteSpace(exe) || !File.Exists(exe))
+            {
+                Log($"[WallpaperEngine] Executable not found. Configured: '{_config.WallpaperEngineExe}'");
+                return;
+            }
 
             Task.Run(() =>
             {
                 try
                 {
+                    bool isRunning = Process.GetProcessesByName("wallpaper32").Length > 0 ||
+                                     Process.GetProcessesByName("wallpaper64").Length > 0;
+
+                    if (!isRunning && !string.IsNullOrWhiteSpace(target.WallpaperEngineItem))
+                    {
+                        Log($"[WallpaperEngine] Starting background process: {exe}");
+                        var startPsi = new ProcessStartInfo
+                        {
+                            FileName = exe,
+                            UseShellExecute = true
+                        };
+                        using var starter = Process.Start(startPsi);
+                        Thread.Sleep(1000);
+                    }
+
                     if (!string.IsNullOrWhiteSpace(target.WallpaperEngineItem) &&
                         (File.Exists(target.WallpaperEngineItem) || Directory.Exists(target.WallpaperEngineItem)))
                     {
+                        Log($"[WallpaperEngine] Applying wallpaper for '{target.Name}': {target.WallpaperEngineItem}");
                         var psi = new ProcessStartInfo
                         {
                             FileName = exe,
@@ -1430,9 +1498,12 @@ namespace WorkSpace
                             CreateNoWindow = true
                         };
                         using var p = Process.Start(psi);
+                        p?.WaitForExit(3000);
+                        Log($"[WallpaperEngine] openWallpaper exit code: {p?.ExitCode}");
                     }
                     else
                     {
+                        Log($"[WallpaperEngine] Stopping live wallpaper for '{target.Name}' (no item selected)");
                         var psi = new ProcessStartInfo
                         {
                             FileName = exe,
@@ -1441,6 +1512,8 @@ namespace WorkSpace
                             CreateNoWindow = true
                         };
                         using var p = Process.Start(psi);
+                        p?.WaitForExit(3000);
+                        Log($"[WallpaperEngine] stop exit code: {p?.ExitCode}");
                     }
                 }
                 catch (Exception ex)

@@ -140,16 +140,66 @@ namespace DeskSpace
             }
         }
 
+        public static string GetActiveOrConfiguredWallpaperEngineExe(string? configuredExe)
+        {
+            try
+            {
+                var p32 = System.Diagnostics.Process.GetProcessesByName("wallpaper32");
+                if (p32.Length > 0)
+                {
+                    string? fn = null;
+                    try { fn = p32[0].MainModule?.FileName; } catch { }
+                    if (!string.IsNullOrEmpty(fn) && File.Exists(fn)) return fn;
+
+                    if (!string.IsNullOrWhiteSpace(configuredExe))
+                    {
+                        string dir = System.IO.Path.GetDirectoryName(configuredExe) ?? "";
+                        string w32 = System.IO.Path.Combine(dir, "wallpaper32.exe");
+                        if (File.Exists(w32)) return w32;
+                    }
+                }
+
+                var p64 = System.Diagnostics.Process.GetProcessesByName("wallpaper64");
+                if (p64.Length > 0)
+                {
+                    string? fn = null;
+                    try { fn = p64[0].MainModule?.FileName; } catch { }
+                    if (!string.IsNullOrEmpty(fn) && File.Exists(fn)) return fn;
+
+                    if (!string.IsNullOrWhiteSpace(configuredExe))
+                    {
+                        string dir = System.IO.Path.GetDirectoryName(configuredExe) ?? "";
+                        string w64 = System.IO.Path.Combine(dir, "wallpaper64.exe");
+                        if (File.Exists(w64)) return w64;
+                    }
+                }
+            }
+            catch { }
+
+            if (!string.IsNullOrWhiteSpace(configuredExe) && File.Exists(configuredExe))
+            {
+                return configuredExe;
+            }
+
+            return DetectWallpaperEnginePath();
+        }
+
         public static string DetectWallpaperEnginePath()
         {
             try
             {
-                var procs = System.Diagnostics.Process.GetProcessesByName("wallpaper64");
-                if (procs.Length == 0) procs = System.Diagnostics.Process.GetProcessesByName("wallpaper32");
-                if (procs.Length > 0)
+                var procs32 = System.Diagnostics.Process.GetProcessesByName("wallpaper32");
+                if (procs32.Length > 0)
                 {
                     string? p = null;
-                    try { p = procs[0].MainModule?.FileName; } catch { }
+                    try { p = procs32[0].MainModule?.FileName; } catch { }
+                    if (!string.IsNullOrEmpty(p) && File.Exists(p)) return p;
+                }
+                var procs64 = System.Diagnostics.Process.GetProcessesByName("wallpaper64");
+                if (procs64.Length > 0)
+                {
+                    string? p = null;
+                    try { p = procs64[0].MainModule?.FileName; } catch { }
                     if (!string.IsNullOrEmpty(p) && File.Exists(p)) return p;
                 }
             }
@@ -1312,6 +1362,17 @@ namespace DeskSpace
                 if (TxtWallpaperEngineExe != null) TxtWallpaperEngineExe.Text = _config.WallpaperEngineExe;
             }
             _config.Save();
+            _previewBitmapCache.Clear();
+
+            var curActive = (_config.CurrentIndex >= 0 && _config.CurrentIndex < _config.Desktops.Count)
+                ? _config.Desktops[_config.CurrentIndex]
+                : null;
+            if (curActive != null)
+            {
+                ApplyWallpaperEngineImmediate(_config.WallpaperEngineEnabled ? curActive.WallpaperEngineItem : "");
+            }
+
+            SendIpcCommand("refresh_previews");
             UpdateWallpaperEngineStatus();
             PopulateDesktopCards();
         }
@@ -3233,6 +3294,15 @@ namespace DeskSpace
                             freshDesk.WallpaperEngineItem = "";
                             _config.Save();
                             _previewBitmapCache.Clear();
+
+                            var activeDesk = (_config.CurrentIndex >= 0 && _config.CurrentIndex < _config.Desktops.Count)
+                                ? _config.Desktops[_config.CurrentIndex]
+                                : null;
+                            if (activeDesk != null && activeDesk.Id == deskId)
+                            {
+                                ApplyWallpaperEngineImmediate("");
+                            }
+
                             SendIpcCommand("refresh_previews");
                             PopulateDesktopCards();
                         };
@@ -3613,7 +3683,7 @@ namespace DeskSpace
             {
                 freshDesk.WallpaperEngineItem = path;
                 _config.WallpaperEngineEnabled = true;
-                ChkWallpaperEngine.IsChecked = true;
+                if (ChkWallpaperEngine != null) ChkWallpaperEngine.IsChecked = true;
                 if (string.IsNullOrWhiteSpace(_config.WallpaperEngineExe))
                 {
                     string det = AppConfig.DetectWallpaperEnginePath();
@@ -3621,6 +3691,15 @@ namespace DeskSpace
                 }
                 _config.Save();
                 _previewBitmapCache.Clear();
+
+                var activeDesk = (_config.CurrentIndex >= 0 && _config.CurrentIndex < _config.Desktops.Count)
+                    ? _config.Desktops[_config.CurrentIndex]
+                    : null;
+                if (activeDesk != null && activeDesk.Id == desktopId)
+                {
+                    ApplyWallpaperEngineImmediate(path);
+                }
+
                 SendIpcCommand("refresh_previews");
                 CloseWallpaperEngineModal();
                 PopulateDesktopCards();
@@ -3674,10 +3753,67 @@ namespace DeskSpace
                 freshDesk.WallpaperEngineItem = "";
                 _config.Save();
                 _previewBitmapCache.Clear();
+
+                var activeDesk = (_config.CurrentIndex >= 0 && _config.CurrentIndex < _config.Desktops.Count)
+                    ? _config.Desktops[_config.CurrentIndex]
+                    : null;
+                if (activeDesk != null && activeDesk.Id == _targetWeDesktopId)
+                {
+                    ApplyWallpaperEngineImmediate("");
+                }
+
                 SendIpcCommand("refresh_previews");
                 CloseWallpaperEngineModal();
                 PopulateDesktopCards();
             }
+        }
+
+        private void ApplyWallpaperEngineImmediate(string itemPath)
+        {
+            Task.Run(() =>
+            {
+                try
+                {
+                    string exe = AppConfig.GetActiveOrConfiguredWallpaperEngineExe(_config.WallpaperEngineExe);
+                    if (string.IsNullOrWhiteSpace(exe) || !File.Exists(exe)) return;
+
+                    bool isRunning = Process.GetProcessesByName("wallpaper32").Length > 0 ||
+                                     Process.GetProcessesByName("wallpaper64").Length > 0;
+
+                    if (!string.IsNullOrWhiteSpace(itemPath) && (File.Exists(itemPath) || Directory.Exists(itemPath)))
+                    {
+                        if (!isRunning)
+                        {
+                            var startPsi = new ProcessStartInfo { FileName = exe, UseShellExecute = true };
+                            using var sp = Process.Start(startPsi);
+                            Thread.Sleep(1000);
+                        }
+
+                        var psi = new ProcessStartInfo
+                        {
+                            FileName = exe,
+                            Arguments = $"-control openWallpaper -file \"{itemPath}\"",
+                            UseShellExecute = false,
+                            CreateNoWindow = true
+                        };
+                        using var p = Process.Start(psi);
+                        p?.WaitForExit(3000);
+                    }
+                    else if (isRunning)
+                    {
+                        var psi = new ProcessStartInfo
+                        {
+                            FileName = exe,
+                            Arguments = "-control stop",
+                            UseShellExecute = false,
+                            CreateNoWindow = true
+                        };
+                        using var p = Process.Start(psi);
+                        p?.WaitForExit(3000);
+                    }
+                }
+                catch { }
+            });
         }
 
         #endregion

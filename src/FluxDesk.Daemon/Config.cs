@@ -129,17 +129,67 @@ namespace WorkSpace
             return null;
         }
 
+        public static string GetActiveOrConfiguredWallpaperEngineExe(string? configuredExe)
+        {
+            try
+            {
+                var p32 = System.Diagnostics.Process.GetProcessesByName("wallpaper32");
+                if (p32.Length > 0)
+                {
+                    string? fn = null;
+                    try { fn = p32[0].MainModule?.FileName; } catch { }
+                    if (!string.IsNullOrEmpty(fn) && File.Exists(fn)) return fn;
+
+                    if (!string.IsNullOrWhiteSpace(configuredExe))
+                    {
+                        string dir = Path.GetDirectoryName(configuredExe) ?? "";
+                        string w32 = Path.Combine(dir, "wallpaper32.exe");
+                        if (File.Exists(w32)) return w32;
+                    }
+                }
+
+                var p64 = System.Diagnostics.Process.GetProcessesByName("wallpaper64");
+                if (p64.Length > 0)
+                {
+                    string? fn = null;
+                    try { fn = p64[0].MainModule?.FileName; } catch { }
+                    if (!string.IsNullOrEmpty(fn) && File.Exists(fn)) return fn;
+
+                    if (!string.IsNullOrWhiteSpace(configuredExe))
+                    {
+                        string dir = Path.GetDirectoryName(configuredExe) ?? "";
+                        string w64 = Path.Combine(dir, "wallpaper64.exe");
+                        if (File.Exists(w64)) return w64;
+                    }
+                }
+            }
+            catch { }
+
+            if (!string.IsNullOrWhiteSpace(configuredExe) && File.Exists(configuredExe))
+            {
+                return configuredExe;
+            }
+
+            return DetectWallpaperEnginePath();
+        }
+
         public static string DetectWallpaperEnginePath()
         {
             // 1. Check active processes
             try
             {
-                var procs = System.Diagnostics.Process.GetProcessesByName("wallpaper64");
-                if (procs.Length == 0) procs = System.Diagnostics.Process.GetProcessesByName("wallpaper32");
-                if (procs.Length > 0)
+                var procs32 = System.Diagnostics.Process.GetProcessesByName("wallpaper32");
+                if (procs32.Length > 0)
                 {
                     string? p = null;
-                    try { p = procs[0].MainModule?.FileName; } catch { }
+                    try { p = procs32[0].MainModule?.FileName; } catch { }
+                    if (!string.IsNullOrEmpty(p) && File.Exists(p)) return p;
+                }
+                var procs64 = System.Diagnostics.Process.GetProcessesByName("wallpaper64");
+                if (procs64.Length > 0)
+                {
+                    string? p = null;
+                    try { p = procs64[0].MainModule?.FileName; } catch { }
                     if (!string.IsNullOrEmpty(p) && File.Exists(p)) return p;
                 }
             }
