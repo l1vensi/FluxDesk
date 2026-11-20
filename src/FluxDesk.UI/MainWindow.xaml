@@ -141,6 +141,12 @@
                                 <Button Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,8,0" Click="BtnSelectAll_Click">
                                     <TextBlock x:Name="TxtBtnSelectAll" Text="Select all" FontSize="12.5"/>
                                 </Button>
+                                <Button x:Name="BtnBulkSetWeWallpaper" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,8,0" Padding="12,7" Click="BtnBulkSetWeWallpaper_Click">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Path Data="{StaticResource IconImage}" Fill="{StaticResource AccentBrush}" Width="13" Height="13" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                        <TextBlock x:Name="TxtBtnBulkSetWeWallpaper" Text="Wallpaper Engine (0)" FontSize="12.5" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                    </StackPanel>
+                                </Button>
                                 <Button x:Name="BtnDeleteSelected" Style="{StaticResource DangerButtonStyle}" Margin="0,0,8,0" Padding="14,7" Click="BtnDeleteSelected_Click">
                                     <TextBlock x:Name="TxtBtnDeleteSelected" Text="Delete (0)" FontSize="12.5" FontWeight="Bold" Foreground="White"/>
                                 </Button>
@@ -723,6 +729,7 @@
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
@@ -753,7 +760,7 @@
                         </Grid>
 
                         <!-- Search Box -->
-                        <Border Grid.Row="1" Background="{StaticResource InputBgBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,0,0,12">
+                        <Border Grid.Row="1" Background="{StaticResource InputBgBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,0,0,10">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
@@ -778,8 +785,22 @@
                             </Grid>
                         </Border>
 
+                        <!-- Desktops Target Selector -->
+                        <Border Grid.Row="2" Background="#161922" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10,6" Margin="0,0,0,12">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="TxtWeTargetLabel" Text="Apply to:" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                                    <StackPanel x:Name="WeTargetDesktopsPanel" Orientation="Horizontal" VerticalAlignment="Center"/>
+                                </ScrollViewer>
+                            </Grid>
+                        </Border>
+
                         <!-- Wallpapers Gallery Scroll Area -->
-                        <Border Grid.Row="2" Background="#11141B" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10" MinHeight="260" MaxHeight="320">
+                        <Border Grid.Row="3" Background="#11141B" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10" MinHeight="260" MaxHeight="320">
                             <Grid>
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                     <WrapPanel x:Name="WeGalleryWrapPanel" HorizontalAlignment="Center"/>
@@ -789,7 +810,7 @@
                         </Border>
 
                         <!-- Footer Actions -->
-                        <Grid Grid.Row="3" Margin="0,14,0,0">
+                        <Grid Grid.Row="4" Margin="0,14,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>

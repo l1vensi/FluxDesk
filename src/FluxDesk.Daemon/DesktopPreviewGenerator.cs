@@ -93,6 +93,7 @@ namespace WorkSpace
         private static Bitmap? _cachedNetworkIcon;
         private static Bitmap? _cachedControlPanelIcon;
         private static readonly Dictionary<string, Bitmap> _extIconCache = new Dictionary<string, Bitmap>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, Bitmap> _perFileIconCache = new Dictionary<string, Bitmap>(StringComparer.OrdinalIgnoreCase);
 
         static DesktopPreviewGenerator()
         {
@@ -256,6 +257,12 @@ namespace WorkSpace
                 try { bmp.Dispose(); } catch { }
             }
             _extIconCache.Clear();
+
+            foreach (var bmp in _perFileIconCache.Values)
+            {
+                try { bmp.Dispose(); } catch { }
+            }
+            _perFileIconCache.Clear();
         }
 
         private static bool IsDeleted(string desktopId)
@@ -670,9 +677,19 @@ namespace WorkSpace
 
                     if (uniquePerFile && !fullPath.StartsWith(@"\\", StringComparison.Ordinal))
                     {
+                        if (_perFileIconCache.TryGetValue(fullPath, out var cachedFileBmp))
+                        {
+                            return cachedFileBmp;
+                        }
+
                         var perFileBmp = GetFileIconBitmap(fullPath, useFileAttributes: false);
                         if (perFileBmp != null)
                         {
+                            if (_perFileIconCache.Count < 600)
+                            {
+                                _perFileIconCache[fullPath] = perFileBmp;
+                                return perFileBmp;
+                            }
                             shouldDispose = true;
                             return perFileBmp;
                         }

@@ -606,7 +606,7 @@ namespace DeskSpace
         private int _pendingConflictVk = 0;
         private List<string> _pendingConflictOtherIds = new List<string>();
         private string? _renamingDesktopId = null;
-        private string? _targetWeDesktopId = null;
+        private readonly HashSet<string> _targetWeDesktopIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private List<WallpaperEngineItem>? _cachedWeLibrary = null;
 
         #region Win32 Interop (Shell, Recycle Bin, Maximize WorkArea)
@@ -1350,7 +1350,8 @@ namespace DeskSpace
             _config.Save();
             _previewBitmapCache.Clear();
             SendIpcCommand("refresh_previews");
-            PopulateDesktopCards();
+            _previewReloadTimer.Stop();
+            _previewReloadTimer.Start();
         }
 
         private void ChkWallpaperEngine_Click(object sender, RoutedEventArgs e)
@@ -2695,21 +2696,33 @@ namespace DeskSpace
         private void UpdateBulkDeleteButtonText()
         {
             bool isRu = (_config.Language == "ru");
-            int count = _selectedDesktopIds.Count;
-            int totalDeletable = Math.Max(0, _config.Desktops.Count - 1);
-            bool allSelected = totalDeletable > 0 && count == totalDeletable;
+            int totalSelected = _selectedDesktopIds.Count;
+            int totalDesktops = _config.Desktops.Count;
+            int deletableCount = _config.Desktops.Skip(1).Count(d => _selectedDesktopIds.Contains(d.Id));
+
+            bool allSelected = totalDesktops > 0 && totalSelected == totalDesktops;
 
             TxtBtnSelectAll.Text = allSelected
                 ? (isRu ? "Снять все" : "Deselect all")
                 : (isRu ? "Выбрать все" : "Select all");
-            TxtBtnDeleteSelected.Text = isRu ? $"Удалить ({count})" : $"Delete ({count})";
-            BtnDeleteSelected.IsEnabled = count > 0;
-            BtnDeleteSelected.Opacity = count > 0 ? 1.0 : 0.45;
+
+            TxtBtnDeleteSelected.Text = isRu ? $"Удалить ({deletableCount})" : $"Delete ({deletableCount})";
+            BtnDeleteSelected.IsEnabled = deletableCount > 0;
+            BtnDeleteSelected.Opacity = deletableCount > 0 ? 1.0 : 0.45;
+
+            if (TxtBtnBulkSetWeWallpaper != null && BtnBulkSetWeWallpaper != null)
+            {
+                TxtBtnBulkSetWeWallpaper.Text = isRu
+                    ? $"Wallpaper Engine ({totalSelected})"
+                    : $"Wallpaper Engine ({totalSelected})";
+                BtnBulkSetWeWallpaper.IsEnabled = totalSelected > 0;
+                BtnBulkSetWeWallpaper.Opacity = totalSelected > 0 ? 1.0 : 0.45;
+            }
         }
 
         private void BtnEnterSelectMode_Click(object sender, RoutedEventArgs e)
         {
-            if (_config.Desktops.Count <= 1) return;
+            if (_config.Desktops.Count == 0) return;
             _isSelectionMode = true;
             _selectedDesktopIds.Clear();
             NormalDesktopActions.Visibility = Visibility.Collapsed;
@@ -2731,18 +2744,24 @@ namespace DeskSpace
 
         private void BtnSelectAll_Click(object sender, RoutedEventArgs e)
         {
-            var deletable = _config.Desktops.Skip(1).Select(d => d.Id).ToList();
-            if (_selectedDesktopIds.Count == deletable.Count)
+            var allIds = _config.Desktops.Select(d => d.Id).ToList();
+            if (_selectedDesktopIds.Count == allIds.Count)
             {
                 _selectedDesktopIds.Clear();
             }
             else
             {
                 _selectedDesktopIds.Clear();
-                foreach (var id in deletable) _selectedDesktopIds.Add(id);
+                foreach (var id in allIds) _selectedDesktopIds.Add(id);
             }
             UpdateBulkDeleteButtonText();
             PopulateDesktopCards();
+        }
+
+        private void BtnBulkSetWeWallpaper_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedDesktopIds.Count == 0) return;
+            OpenWallpaperEngineGalleryModal(_selectedDesktopIds);
         }
 
         private void BtnDeleteSelected_Click(object sender, RoutedEventArgs e)
@@ -2963,19 +2982,19 @@ namespace DeskSpace
                 var cardBorder = new Border
                 {
                     Background = isSelected
-                        ? new SolidColorBrush(Color.FromRgb(42, 24, 28))
+                        ? (SolidColorBrush)FindResource("AccentTintBrush")
                         : (isActive ? (SolidColorBrush)FindResource("AccentTintBrush") : (SolidColorBrush)FindResource("CardBrush")),
                     BorderBrush = isSelected
-                        ? new SolidColorBrush(Color.FromRgb(220, 38, 38))
+                        ? (SolidColorBrush)FindResource("AccentBrush")
                         : (isActive ? (SolidColorBrush)FindResource("AccentBrush") : (SolidColorBrush)FindResource("BorderBrush")),
                     BorderThickness = new Thickness((isActive || isSelected) ? 1.5 : 1),
                     CornerRadius = new CornerRadius(10),
                     Padding = new Thickness(16),
                     Margin = new Thickness(0, 0, 0, 14),
-                    Cursor = (_isSelectionMode && i > 0) ? Cursors.Hand : Cursors.Arrow
+                    Cursor = _isSelectionMode ? Cursors.Hand : Cursors.Arrow
                 };
 
-                if (_isSelectionMode && i > 0)
+                if (_isSelectionMode)
                 {
                     cardBorder.MouseLeftButtonUp += (s, e) =>
                     {
@@ -2999,35 +3018,32 @@ namespace DeskSpace
                 if (_isSelectionMode)
                 {
                     colOffset = 1;
-                    if (i > 0)
+                    var selBox = new Border
                     {
-                        var selBox = new Border
+                        Width = 20,
+                        Height = 20,
+                        CornerRadius = new CornerRadius(5),
+                        Background = isSelected ? accentBrush : new SolidColorBrush(Color.FromRgb(24, 29, 38)),
+                        BorderBrush = isSelected ? accentBrush : (Brush)FindResource("BorderBrush"),
+                        BorderThickness = new Thickness(1.5),
+                        VerticalAlignment = VerticalAlignment.Center,
+                        HorizontalAlignment = HorizontalAlignment.Left
+                    };
+                    if (isSelected)
+                    {
+                        selBox.Child = new System.Windows.Shapes.Path
                         {
-                            Width = 20,
-                            Height = 20,
-                            CornerRadius = new CornerRadius(5),
-                            Background = isSelected ? new SolidColorBrush(Color.FromRgb(220, 38, 38)) : new SolidColorBrush(Color.FromRgb(24, 29, 38)),
-                            BorderBrush = isSelected ? dangerBrush : (Brush)FindResource("BorderBrush"),
-                            BorderThickness = new Thickness(1.5),
-                            VerticalAlignment = VerticalAlignment.Center,
-                            HorizontalAlignment = HorizontalAlignment.Left
+                            Data = (Geometry)FindResource("IconCheck"),
+                            Fill = new SolidColorBrush(Color.FromRgb(13, 17, 23)),
+                            Width = 11,
+                            Height = 11,
+                            Stretch = Stretch.Uniform,
+                            HorizontalAlignment = HorizontalAlignment.Center,
+                            VerticalAlignment = VerticalAlignment.Center
                         };
-                        if (isSelected)
-                        {
-                            selBox.Child = new System.Windows.Shapes.Path
-                            {
-                                Data = (Geometry)FindResource("IconCheck"),
-                                Fill = Brushes.White,
-                                Width = 11,
-                                Height = 11,
-                                Stretch = Stretch.Uniform,
-                                HorizontalAlignment = HorizontalAlignment.Center,
-                                VerticalAlignment = VerticalAlignment.Center
-                            };
-                        }
-                        Grid.SetColumn(selBox, 0);
-                        grid.Children.Add(selBox);
                     }
+                    Grid.SetColumn(selBox, 0);
+                    grid.Children.Add(selBox);
                 }
 
                 // 1. Live Desktop Thumbnail Preview (cached frozen BitmapImage)
@@ -3451,20 +3467,35 @@ namespace DeskSpace
 
         private void OpenWallpaperEngineGalleryModal(string desktopId)
         {
-            var d = _config.Desktops.FirstOrDefault(x => x.Id == desktopId);
-            if (d == null) return;
+            OpenWallpaperEngineGalleryModal(new[] { desktopId });
+        }
 
-            _targetWeDesktopId = d.Id;
+        private void OpenWallpaperEngineGalleryModal(IEnumerable<string> desktopIds)
+        {
+            _targetWeDesktopIds.Clear();
+            foreach (var id in desktopIds)
+            {
+                if (_config.Desktops.Any(d => d.Id == id)) _targetWeDesktopIds.Add(id);
+            }
+            if (_targetWeDesktopIds.Count == 0 && _config.Desktops.Count > 0)
+            {
+                _targetWeDesktopIds.Add(_config.Desktops[0].Id);
+            }
+
             bool isRu = _config.Language == "ru";
 
             TxtWeModalTitle.Text = isRu ? "Живые обои Wallpaper Engine" : "Wallpaper Engine Gallery";
-            TxtWeModalSubtitle.Text = isRu ? $"Рабочий стол: «{d.Name}»" : $"Workspace: \"{d.Name}\"";
             TxtWeModalBrowseFile.Text = isRu ? "Выбрать файл..." : "Browse file...";
             TxtWeModalClear.Text = isRu ? "Убрать живые обои" : "Remove live wallpaper";
             TxtWeModalClose.Text = isRu ? "Закрыть" : "Close";
             TxtWeSearchPlaceholder.Text = isRu ? "Поиск по названию..." : "Search wallpapers by title...";
+            TxtWeTargetLabel.Text = isRu ? "Применить к:" : "Apply to:";
 
-            BtnWeModalClear.Visibility = !string.IsNullOrWhiteSpace(d.WallpaperEngineItem)
+            UpdateWeModalTargetSubtitle();
+            PopulateWeTargetChips();
+
+            bool anyHasWe = _config.Desktops.Any(d => _targetWeDesktopIds.Contains(d.Id) && !string.IsNullOrWhiteSpace(d.WallpaperEngineItem));
+            BtnWeModalClear.Visibility = anyHasWe
                 ? Visibility.Visible
                 : Visibility.Collapsed;
 
@@ -3474,17 +3505,130 @@ namespace DeskSpace
             RefreshWeGalleryView();
         }
 
+        private void UpdateWeModalTargetSubtitle()
+        {
+            bool isRu = _config.Language == "ru";
+            int count = _targetWeDesktopIds.Count;
+            if (count == 1)
+            {
+                string singleId = _targetWeDesktopIds.First();
+                var d = _config.Desktops.FirstOrDefault(x => x.Id == singleId);
+                TxtWeModalSubtitle.Text = isRu ? $"Рабочий стол: «{d?.Name}»" : $"Workspace: \"{d?.Name}\"";
+            }
+            else if (count == _config.Desktops.Count)
+            {
+                TxtWeModalSubtitle.Text = isRu ? "Выбрано: Все рабочие столы" : "Selected: All workspaces";
+            }
+            else
+            {
+                TxtWeModalSubtitle.Text = isRu ? $"Выбрано столов: {count}" : $"Selected workspaces: {count}";
+            }
+        }
+
+        private void PopulateWeTargetChips()
+        {
+            if (WeTargetDesktopsPanel == null) return;
+            WeTargetDesktopsPanel.Children.Clear();
+            bool isRu = _config.Language == "ru";
+
+            var accentBrush = (Brush)FindResource("AccentBrush");
+            var borderBrush = (Brush)FindResource("BorderBrush");
+            var textPrimary = (Brush)FindResource("TextPrimaryBrush");
+
+            // [ Все столы ] chip
+            bool allSelected = _targetWeDesktopIds.Count == _config.Desktops.Count;
+            var btnAll = new Button
+            {
+                Height = 26,
+                Padding = new Thickness(10, 0, 10, 0),
+                Margin = new Thickness(0, 0, 6, 0),
+                Background = allSelected ? (Brush)FindResource("AccentTintBrush") : (Brush)FindResource("InputBgBrush"),
+                BorderBrush = allSelected ? accentBrush : borderBrush,
+                BorderThickness = new Thickness(1),
+                Cursor = Cursors.Hand,
+                Style = (Style)FindResource("SecondaryButtonStyle")
+            };
+            btnAll.Content = new TextBlock
+            {
+                Text = isRu ? "Все столы" : "All Desktops",
+                FontSize = 11.5,
+                FontWeight = allSelected ? FontWeights.Bold : FontWeights.Normal,
+                Foreground = allSelected ? accentBrush : textPrimary,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            btnAll.Click += (s, e) =>
+            {
+                if (_targetWeDesktopIds.Count == _config.Desktops.Count)
+                {
+                    _targetWeDesktopIds.Clear();
+                    if (_config.Desktops.Count > 0) _targetWeDesktopIds.Add(_config.Desktops[0].Id);
+                }
+                else
+                {
+                    _targetWeDesktopIds.Clear();
+                    foreach (var d in _config.Desktops) _targetWeDesktopIds.Add(d.Id);
+                }
+                UpdateWeModalTargetSubtitle();
+                PopulateWeTargetChips();
+                RefreshWeGalleryView();
+            };
+            WeTargetDesktopsPanel.Children.Add(btnAll);
+
+            // Chips for each desktop
+            foreach (var d in _config.Desktops)
+            {
+                string id = d.Id;
+                bool isTargeted = _targetWeDesktopIds.Contains(id);
+
+                var chip = new Button
+                {
+                    Height = 26,
+                    Padding = new Thickness(10, 0, 10, 0),
+                    Margin = new Thickness(0, 0, 6, 0),
+                    Background = isTargeted ? (Brush)FindResource("AccentTintBrush") : (Brush)FindResource("InputBgBrush"),
+                    BorderBrush = isTargeted ? accentBrush : borderBrush,
+                    BorderThickness = new Thickness(1),
+                    Cursor = Cursors.Hand,
+                    Style = (Style)FindResource("SecondaryButtonStyle")
+                };
+                chip.Content = new TextBlock
+                {
+                    Text = d.Name,
+                    FontSize = 11.5,
+                    FontWeight = isTargeted ? FontWeights.Bold : FontWeights.Normal,
+                    Foreground = isTargeted ? accentBrush : textPrimary,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                chip.Click += (s, e) =>
+                {
+                    if (_targetWeDesktopIds.Contains(id))
+                    {
+                        if (_targetWeDesktopIds.Count > 1) _targetWeDesktopIds.Remove(id);
+                    }
+                    else
+                    {
+                        _targetWeDesktopIds.Add(id);
+                    }
+                    UpdateWeModalTargetSubtitle();
+                    PopulateWeTargetChips();
+                    RefreshWeGalleryView();
+                };
+                WeTargetDesktopsPanel.Children.Add(chip);
+            }
+        }
+
         private void CloseWallpaperEngineModal()
         {
             SetModalState(WeModalOverlay, false);
-            _targetWeDesktopId = null;
+            _targetWeDesktopIds.Clear();
         }
 
         private void RefreshWeGalleryView()
         {
-            if (_targetWeDesktopId == null) return;
-            var desk = _config.Desktops.FirstOrDefault(x => x.Id == _targetWeDesktopId);
-            string currentItem = desk?.WallpaperEngineItem ?? "";
+            if (_targetWeDesktopIds.Count == 0) return;
+            string currentItem = _targetWeDesktopIds.Count == 1
+                ? (_config.Desktops.FirstOrDefault(x => x.Id == _targetWeDesktopIds.First())?.WallpaperEngineItem ?? "")
+                : "";
             string filter = TxtWeSearch?.Text?.Trim() ?? "";
 
             if (_cachedWeLibrary != null)
@@ -3666,9 +3810,9 @@ namespace DeskSpace
                 string pjPath = item.ProjectJsonPath;
                 card.MouseDown += (s, e) =>
                 {
-                    if (e.ChangedButton == MouseButton.Left && _targetWeDesktopId != null)
+                    if (e.ChangedButton == MouseButton.Left && _targetWeDesktopIds.Count > 0)
                     {
-                        SelectWallpaperForDesktop(_targetWeDesktopId, pjPath);
+                        SelectWallpaperForDesktops(_targetWeDesktopIds, pjPath);
                     }
                 };
 
@@ -3676,34 +3820,37 @@ namespace DeskSpace
             }
         }
 
-        private void SelectWallpaperForDesktop(string desktopId, string path)
+        private void SelectWallpaperForDesktops(IEnumerable<string> desktopIds, string path)
         {
-            var freshDesk = _config.Desktops.FirstOrDefault(x => x.Id == desktopId);
-            if (freshDesk != null)
+            var targetList = _config.Desktops.Where(x => desktopIds.Contains(x.Id)).ToList();
+            if (targetList.Count == 0) return;
+
+            foreach (var desk in targetList)
             {
-                freshDesk.WallpaperEngineItem = path;
-                _config.WallpaperEngineEnabled = true;
-                if (ChkWallpaperEngine != null) ChkWallpaperEngine.IsChecked = true;
-                if (string.IsNullOrWhiteSpace(_config.WallpaperEngineExe))
-                {
-                    string det = AppConfig.DetectWallpaperEnginePath();
-                    if (!string.IsNullOrEmpty(det)) _config.WallpaperEngineExe = det;
-                }
-                _config.Save();
-                _previewBitmapCache.Clear();
-
-                var activeDesk = (_config.CurrentIndex >= 0 && _config.CurrentIndex < _config.Desktops.Count)
-                    ? _config.Desktops[_config.CurrentIndex]
-                    : null;
-                if (activeDesk != null && activeDesk.Id == desktopId)
-                {
-                    ApplyWallpaperEngineImmediate(path);
-                }
-
-                SendIpcCommand("refresh_previews");
-                CloseWallpaperEngineModal();
-                PopulateDesktopCards();
+                desk.WallpaperEngineItem = path;
             }
+            _config.WallpaperEngineEnabled = true;
+            if (ChkWallpaperEngine != null) ChkWallpaperEngine.IsChecked = true;
+            if (string.IsNullOrWhiteSpace(_config.WallpaperEngineExe))
+            {
+                string det = AppConfig.DetectWallpaperEnginePath();
+                if (!string.IsNullOrEmpty(det)) _config.WallpaperEngineExe = det;
+            }
+            _config.Save();
+            _previewBitmapCache.Clear();
+
+            var activeDesk = (_config.CurrentIndex >= 0 && _config.CurrentIndex < _config.Desktops.Count)
+                ? _config.Desktops[_config.CurrentIndex]
+                : null;
+            if (activeDesk != null && targetList.Any(d => d.Id == activeDesk.Id))
+            {
+                ApplyWallpaperEngineImmediate(path);
+            }
+
+            SendIpcCommand("refresh_previews");
+            CloseWallpaperEngineModal();
+            if (_isSelectionMode) ExitSelectionMode(refreshCards: false);
+            PopulateDesktopCards();
         }
 
         private void TxtWeSearch_TextChanged(object sender, TextChangedEventArgs e)
@@ -3712,16 +3859,18 @@ namespace DeskSpace
                 ? Visibility.Visible
                 : Visibility.Collapsed;
 
-            if (_cachedWeLibrary != null && _targetWeDesktopId != null)
+            if (_cachedWeLibrary != null && _targetWeDesktopIds.Count > 0)
             {
-                var desk = _config.Desktops.FirstOrDefault(x => x.Id == _targetWeDesktopId);
-                RenderWeGalleryCards(_cachedWeLibrary, desk?.WallpaperEngineItem ?? "", TxtWeSearch.Text.Trim());
+                string curItem = _targetWeDesktopIds.Count == 1
+                    ? (_config.Desktops.FirstOrDefault(x => x.Id == _targetWeDesktopIds.First())?.WallpaperEngineItem ?? "")
+                    : "";
+                RenderWeGalleryCards(_cachedWeLibrary, curItem, TxtWeSearch.Text.Trim());
             }
         }
 
         private void BtnWeModalBrowseFile_Click(object sender, RoutedEventArgs e)
         {
-            if (_targetWeDesktopId == null) return;
+            if (_targetWeDesktopIds.Count == 0) return;
             bool isRu = _config.Language == "ru";
             var dlg = new Microsoft.Win32.OpenFileDialog
             {
@@ -3735,7 +3884,7 @@ namespace DeskSpace
 
             if (dlg.ShowDialog() == true && File.Exists(dlg.FileName))
             {
-                SelectWallpaperForDesktop(_targetWeDesktopId, dlg.FileName);
+                SelectWallpaperForDesktops(_targetWeDesktopIds, dlg.FileName);
             }
         }
 
@@ -3746,26 +3895,34 @@ namespace DeskSpace
 
         private void BtnWeModalClear_Click(object sender, RoutedEventArgs e)
         {
-            if (_targetWeDesktopId == null) return;
-            var freshDesk = _config.Desktops.FirstOrDefault(x => x.Id == _targetWeDesktopId);
-            if (freshDesk != null)
+            if (_targetWeDesktopIds.Count == 0) return;
+            ClearWallpaperEngineForDesktops(_targetWeDesktopIds);
+        }
+
+        private void ClearWallpaperEngineForDesktops(IEnumerable<string> desktopIds)
+        {
+            var targetList = _config.Desktops.Where(x => desktopIds.Contains(x.Id)).ToList();
+            if (targetList.Count == 0) return;
+
+            foreach (var desk in targetList)
             {
-                freshDesk.WallpaperEngineItem = "";
-                _config.Save();
-                _previewBitmapCache.Clear();
-
-                var activeDesk = (_config.CurrentIndex >= 0 && _config.CurrentIndex < _config.Desktops.Count)
-                    ? _config.Desktops[_config.CurrentIndex]
-                    : null;
-                if (activeDesk != null && activeDesk.Id == _targetWeDesktopId)
-                {
-                    ApplyWallpaperEngineImmediate("");
-                }
-
-                SendIpcCommand("refresh_previews");
-                CloseWallpaperEngineModal();
-                PopulateDesktopCards();
+                desk.WallpaperEngineItem = "";
             }
+            _config.Save();
+            _previewBitmapCache.Clear();
+
+            var activeDesk = (_config.CurrentIndex >= 0 && _config.CurrentIndex < _config.Desktops.Count)
+                ? _config.Desktops[_config.CurrentIndex]
+                : null;
+            if (activeDesk != null && targetList.Any(d => d.Id == activeDesk.Id))
+            {
+                ApplyWallpaperEngineImmediate("");
+            }
+
+            SendIpcCommand("refresh_previews");
+            CloseWallpaperEngineModal();
+            if (_isSelectionMode) ExitSelectionMode(refreshCards: false);
+            PopulateDesktopCards();
         }
 
         private void ApplyWallpaperEngineImmediate(string itemPath)

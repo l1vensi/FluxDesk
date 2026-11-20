@@ -680,10 +680,15 @@ namespace WorkSpace
             {
                 if (IsDisposed || Volatile.Read(ref _isSwitching) != 0) return;
                 var liveIcons = IconLayoutManager.GetCurrentIcons();
+                var activeDesk = snapshotDesktops.FirstOrDefault(d => d.Id == activeId);
+                if (activeDesk != null)
+                {
+                    DesktopPreviewGenerator.QueueRender(activeDesk, indWp, defWp, liveIcons, showIcons);
+                }
                 foreach (var d in snapshotDesktops)
                 {
-                    bool isActive = !string.IsNullOrEmpty(activeId) && d.Id == activeId;
-                    DesktopPreviewGenerator.QueueRender(d, indWp, defWp, isActive ? liveIcons : null, showIcons);
+                    if (d.Id == activeId) continue;
+                    DesktopPreviewGenerator.QueueRender(d, indWp, defWp, null, showIcons);
                 }
             });
         }
