@@ -141,6 +141,12 @@
                                 <Button Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,8,0" Click="BtnSelectAll_Click">
                                     <TextBlock x:Name="TxtBtnSelectAll" Text="Select all" FontSize="12.5"/>
                                 </Button>
+                                <Button x:Name="BtnBulkSetWallpaper" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,8,0" Padding="12,7" Click="BtnBulkSetWallpaper_Click">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Path Data="{StaticResource IconImage}" Fill="{StaticResource AccentBrush}" Width="13" Height="13" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                        <TextBlock x:Name="TxtBtnBulkSetWallpaper" Text="Wallpapers (0)" FontSize="12.5" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                    </StackPanel>
+                                </Button>
                                 <Button x:Name="BtnBulkSetWeWallpaper" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,8,0" Padding="12,7" Click="BtnBulkSetWeWallpaper_Click">
                                     <StackPanel Orientation="Horizontal">
                                         <Path Data="{StaticResource IconImage}" Fill="{StaticResource AccentBrush}" Width="13" Height="13" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0"/>
@@ -720,8 +726,9 @@
                         BorderBrush="{StaticResource AccentBorderBrush}"
                         BorderThickness="1.5"
                         CornerRadius="12"
-                        Width="760"
-                        MaxHeight="540"
+                        Width="950"
+                        MaxWidth="1020"
+                        MaxHeight="660"
                         VerticalAlignment="Center"
                         HorizontalAlignment="Center"
                         Padding="22">
@@ -800,7 +807,7 @@
                         </Border>
 
                         <!-- Wallpapers Gallery Scroll Area -->
-                        <Border Grid.Row="3" Background="#11141B" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10" MinHeight="260" MaxHeight="320">
+                        <Border Grid.Row="3" Background="#11141B" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10" MinHeight="380" MaxHeight="480">
                             <Grid>
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                     <WrapPanel x:Name="WeGalleryWrapPanel" HorizontalAlignment="Center"/>

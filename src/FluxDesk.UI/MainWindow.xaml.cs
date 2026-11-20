@@ -2743,6 +2743,25 @@ namespace DeskSpace
             BtnDeleteSelected.IsEnabled = deletableCount > 0;
             BtnDeleteSelected.Opacity = deletableCount > 0 ? 1.0 : 0.45;
 
+            if (TxtBtnBulkSetWallpaper != null && BtnBulkSetWallpaper != null)
+            {
+                TxtBtnBulkSetWallpaper.Text = isRu
+                    ? $"Обои ({totalSelected})"
+                    : $"Wallpapers ({totalSelected})";
+                BtnBulkSetWallpaper.IsEnabled = totalSelected > 0;
+                BtnBulkSetWallpaper.Opacity = totalSelected > 0 ? 1.0 : 0.45;
+            }
+
+            string weExe = !string.IsNullOrWhiteSpace(_config.WallpaperEngineExe) && File.Exists(_config.WallpaperEngineExe)
+                ? _config.WallpaperEngineExe
+                : AppConfig.DetectWallpaperEnginePath();
+            bool weAvailable = !string.IsNullOrWhiteSpace(weExe) || _config.WallpaperEngineEnabled;
+
+            if (BtnBulkSetWeWallpaper != null)
+            {
+                BtnBulkSetWeWallpaper.Visibility = weAvailable ? Visibility.Visible : Visibility.Collapsed;
+            }
+
             if (TxtBtnBulkSetWeWallpaper != null && BtnBulkSetWeWallpaper != null)
             {
                 TxtBtnBulkSetWeWallpaper.Text = isRu
@@ -2789,6 +2808,56 @@ namespace DeskSpace
             }
             UpdateBulkDeleteButtonText();
             PopulateDesktopCards();
+        }
+
+        private void BtnBulkSetWallpaper_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedDesktopIds.Count == 0) return;
+            bool isRu = (_config.Language == "ru");
+
+            var dlg = new Microsoft.Win32.OpenFileDialog
+            {
+                Title = isRu ? "Выберите обои для выделенных столов" : "Select wallpaper for selected workspaces",
+                Filter = isRu
+                    ? "Изображения (*.jpg;*.jpeg;*.png;*.bmp)|*.jpg;*.jpeg;*.png;*.bmp"
+                    : "Images (*.jpg;*.jpeg;*.png;*.bmp)|*.jpg;*.jpeg;*.png;*.bmp"
+            };
+
+            if (dlg.ShowDialog() == true && File.Exists(dlg.FileName))
+            {
+                string chosen = dlg.FileName;
+                var targets = _config.Desktops.Where(d => _selectedDesktopIds.Contains(d.Id)).ToList();
+                if (targets.Count == 0) return;
+
+                if (string.IsNullOrWhiteSpace(_config.DefaultWallpaperPath))
+                {
+                    string curWp = GetCurrentWindowsWallpaper();
+                    if (!string.IsNullOrWhiteSpace(curWp) && File.Exists(curWp))
+                        _config.DefaultWallpaperPath = curWp;
+                }
+
+                _config.IndependentWallpapers = true;
+                if (ChkIndependentWallpapers != null) ChkIndependentWallpapers.IsChecked = true;
+
+                foreach (var desk in targets)
+                {
+                    desk.WallpaperPath = chosen;
+                }
+                _config.Save();
+                _previewBitmapCache.Clear();
+
+                var activeDesk = (_config.CurrentIndex >= 0 && _config.CurrentIndex < _config.Desktops.Count)
+                    ? _config.Desktops[_config.CurrentIndex]
+                    : null;
+                if (activeDesk != null && targets.Any(d => d.Id == activeDesk.Id))
+                {
+                    SetWindowsWallpaperDirect(chosen);
+                }
+
+                SendIpcCommand("refresh_previews");
+                ExitSelectionMode(refreshCards: false);
+                PopulateDesktopCards();
+            }
         }
 
         private void BtnBulkSetWeWallpaper_Click(object sender, RoutedEventArgs e)
