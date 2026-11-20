@@ -13,6 +13,8 @@
 ## Single-file publish output
 publish/
 publish_single/
+publish_daemon/
+publish_ui/
 
 ## Windows OS files
 Thumbs.db

@@ -7,7 +7,10 @@ Lightweight, private desktop workspace manager for Windows 10 & 11 with native s
 - **Native Shell Redirection**: Official Windows Known Folder API integration (`SHSetKnownFolderPath`).
 - **Physical Workspace Isolation**: Each desktop is an independent directory on disk.
 - **Pixel-Accurate Icon Memory**: Restores custom icon layouts per workspace via ListView memory inspection.
-- **Low-Latency Switcher**: Hardware-accelerated quick switcher (`Alt + W`) with zero focus stealing in games.
+- **Wallpaper Engine Integration**: Full live wallpaper support with automatic Steam library detection, visual gallery picker, silent background execution, and graceful fallback.
+- **Independent Wallpapers**: Assign static images (`.jpg`, `.png`, `.bmp`) or live wallpapers per workspace with instant application and multi-desktop bulk assignment.
+- **Low-Latency Switcher**: Hardware-accelerated quick switcher (`Alt + W`) with live preview cards, instant toggle, and zero focus stealing in games.
+- **High-Performance Preview Engine**: Dedicated STA icon caching rendering multi-icon desktop previews in under 15ms.
 - **Hotkeys**: Customizable switching hotkeys (`Alt + 1` through `Alt + 9`).
 - **Data Protection**: Safe deletion with optional Recycle Bin support; automatic primary desktop restoration on system shutdown.
 - **Zero Telemetry**: Fully offline, local, and private.
