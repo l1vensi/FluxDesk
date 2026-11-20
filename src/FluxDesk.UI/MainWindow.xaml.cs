@@ -205,32 +205,65 @@ namespace DeskSpace
             }
             catch { }
 
+            // 2. Check Steam registry HKCU\Software\Valve\Steam\SteamPath and libraryfolders.vdf
             try
             {
                 using var key = Registry.CurrentUser.OpenSubKey(@"Software\Valve\Steam");
                 if (key?.GetValue("SteamPath") is string steamPath && !string.IsNullOrWhiteSpace(steamPath))
                 {
                     string norm = steamPath.Replace('/', '\\');
-                    string c64 = System.IO.Path.Combine(norm, "steamapps", "common", "wallpaper_engine", "wallpaper64.exe");
-                    if (File.Exists(c64)) return c64;
                     string c32 = System.IO.Path.Combine(norm, "steamapps", "common", "wallpaper_engine", "wallpaper32.exe");
                     if (File.Exists(c32)) return c32;
+                    string c64 = System.IO.Path.Combine(norm, "steamapps", "common", "wallpaper_engine", "wallpaper64.exe");
+                    if (File.Exists(c64)) return c64;
+
+                    // Parse secondary Steam libraries from libraryfolders.vdf
+                    string vdf = System.IO.Path.Combine(norm, "steamapps", "libraryfolders.vdf");
+                    if (File.Exists(vdf))
+                    {
+                        foreach (var line in File.ReadLines(vdf))
+                        {
+                            string trimmed = line.Trim();
+                            if (trimmed.StartsWith("\"path\"", StringComparison.OrdinalIgnoreCase))
+                            {
+                                int firstQuote = trimmed.IndexOf('"', 6);
+                                int lastQuote = trimmed.LastIndexOf('"');
+                                if (firstQuote >= 0 && lastQuote > firstQuote)
+                                {
+                                    string libPath = trimmed.Substring(firstQuote + 1, lastQuote - firstQuote - 1).Replace(@"\\", @"\");
+                                    string lib32 = System.IO.Path.Combine(libPath, "steamapps", "common", "wallpaper_engine", "wallpaper32.exe");
+                                    if (File.Exists(lib32)) return lib32;
+                                    string lib64 = System.IO.Path.Combine(libPath, "steamapps", "common", "wallpaper_engine", "wallpaper64.exe");
+                                    if (File.Exists(lib64)) return lib64;
+                                }
+                            }
+                        }
+                    }
                 }
             }
             catch { }
 
-            try
+            // 3. Check Steam App 431960 uninstall registry (both native & WOW6432Node)
+            string[] uninstallKeys =
             {
-                using var key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Steam App 431960");
-                if (key?.GetValue("InstallLocation") is string installLoc && !string.IsNullOrWhiteSpace(installLoc))
+                @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Steam App 431960",
+                @"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Steam App 431960"
+            };
+            foreach (var uk in uninstallKeys)
+            {
+                try
                 {
-                    string c64 = System.IO.Path.Combine(installLoc, "wallpaper64.exe");
-                    if (File.Exists(c64)) return c64;
-                    string c32 = System.IO.Path.Combine(installLoc, "wallpaper32.exe");
-                    if (File.Exists(c32)) return c32;
+                    using var key = Registry.LocalMachine.OpenSubKey(uk);
+                    if (key?.GetValue("InstallLocation") is string installLoc && !string.IsNullOrWhiteSpace(installLoc))
+                    {
+                        string c32 = System.IO.Path.Combine(installLoc, "wallpaper32.exe");
+                        if (File.Exists(c32)) return c32;
+                        string c64 = System.IO.Path.Combine(installLoc, "wallpaper64.exe");
+                        if (File.Exists(c64)) return c64;
+                    }
                 }
+                catch { }
             }
-            catch { }
 
             string[] standardDrives = { "C", "D", "E", "F", "G" };
             foreach (var d in standardDrives)
@@ -3941,7 +3974,7 @@ namespace DeskSpace
                     {
                         if (!isRunning)
                         {
-                            var startPsi = new ProcessStartInfo { FileName = exe, UseShellExecute = true };
+                            var startPsi = new ProcessStartInfo { FileName = exe, Arguments = "-silent", UseShellExecute = true };
                             using var sp = Process.Start(startPsi);
                             Thread.Sleep(1000);
                         }

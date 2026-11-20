@@ -1485,6 +1485,7 @@ namespace WorkSpace
                         var startPsi = new ProcessStartInfo
                         {
                             FileName = exe,
+                            Arguments = "-silent",
                             UseShellExecute = true
                         };
                         using var starter = Process.Start(startPsi);
