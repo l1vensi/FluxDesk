@@ -447,6 +447,15 @@ namespace WorkSpace
             return path;
         }
 
+        public void ClearPreviewCache()
+        {
+            foreach (var kv in _previewCache.Values)
+            {
+                try { kv.bmp.Dispose(); } catch { }
+            }
+            _previewCache.Clear();
+        }
+
         protected override void Dispose(bool disposing)
         {
             if (disposing)

@@ -52,6 +52,14 @@ namespace DeskSpace
         public bool Enabled { get; set; } = true;
     }
 
+    public class WallpaperEngineItem
+    {
+        public string Title { get; set; } = "";
+        public string ProjectJsonPath { get; set; } = "";
+        public string PreviewImagePath { get; set; } = "";
+        public string Type { get; set; } = "";
+    }
+
     public class AppConfig
     {
         private static readonly Regex SafeIdRegex = new Regex(@"^[a-zA-Z0-9_-]{1,32}$", RegexOptions.Compiled);
@@ -231,6 +239,106 @@ namespace DeskSpace
             }
             catch { }
             return "";
+        }
+
+        public static List<WallpaperEngineItem> DiscoverWallpapers(string? weExePath = null)
+        {
+            var results = new List<WallpaperEngineItem>();
+            var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            var scanDirs = new List<string>();
+            string wsDir = GetWallpaperEngineWorkshopDir(weExePath);
+            if (!string.IsNullOrEmpty(wsDir) && Directory.Exists(wsDir))
+            {
+                scanDirs.Add(wsDir);
+            }
+
+            string exe = !string.IsNullOrWhiteSpace(weExePath) && File.Exists(weExePath)
+                ? weExePath
+                : DetectWallpaperEnginePath();
+
+            if (!string.IsNullOrEmpty(exe) && File.Exists(exe))
+            {
+                string? commonDir = System.IO.Path.GetDirectoryName(exe);
+                if (!string.IsNullOrEmpty(commonDir))
+                {
+                    string defProj = System.IO.Path.Combine(commonDir, "projects", "defaultprojects");
+                    if (Directory.Exists(defProj)) scanDirs.Add(defProj);
+                    string myProj = System.IO.Path.Combine(commonDir, "projects", "myprojects");
+                    if (Directory.Exists(myProj)) scanDirs.Add(myProj);
+                }
+            }
+
+            foreach (var root in scanDirs)
+            {
+                try
+                {
+                    foreach (var sub in Directory.EnumerateDirectories(root))
+                    {
+                        string pj = System.IO.Path.Combine(sub, "project.json");
+                        if (!File.Exists(pj) || seenPaths.Contains(pj)) continue;
+                        seenPaths.Add(pj);
+
+                        try
+                        {
+                            string json = File.ReadAllText(pj);
+                            using var doc = JsonDocument.Parse(json);
+                            var rootElem = doc.RootElement;
+
+                            string title = "";
+                            if (rootElem.TryGetProperty("title", out var tProp) && tProp.ValueKind == JsonValueKind.String)
+                            {
+                                title = tProp.GetString()?.Trim() ?? "";
+                            }
+                            if (string.IsNullOrWhiteSpace(title))
+                            {
+                                title = System.IO.Path.GetFileName(sub);
+                            }
+
+                            string previewName = "";
+                            if (rootElem.TryGetProperty("preview", out var pProp) && pProp.ValueKind == JsonValueKind.String)
+                            {
+                                previewName = pProp.GetString()?.Trim() ?? "";
+                            }
+
+                            string previewPath = "";
+                            if (!string.IsNullOrEmpty(previewName))
+                            {
+                                string cand = System.IO.Path.Combine(sub, previewName);
+                                if (File.Exists(cand)) previewPath = cand;
+                            }
+
+                            if (string.IsNullOrEmpty(previewPath))
+                            {
+                                string[] common = { "preview.jpg", "preview.png", "preview.gif", "preview.jpeg" };
+                                foreach (var c in common)
+                                {
+                                    string cand = System.IO.Path.Combine(sub, c);
+                                    if (File.Exists(cand)) { previewPath = cand; break; }
+                                }
+                            }
+
+                            string type = "";
+                            if (rootElem.TryGetProperty("type", out var typeProp) && typeProp.ValueKind == JsonValueKind.String)
+                            {
+                                type = typeProp.GetString()?.Trim() ?? "";
+                            }
+
+                            results.Add(new WallpaperEngineItem
+                            {
+                                Title = title,
+                                ProjectJsonPath = pj,
+                                PreviewImagePath = previewPath,
+                                Type = type
+                            });
+                        }
+                        catch { }
+                    }
+                }
+                catch { }
+            }
+
+            return results.OrderBy(x => x.Title, StringComparer.CurrentCultureIgnoreCase).ToList();
         }
 
         private static T WithConfigMutex<T>(Func<T> action)
@@ -448,6 +556,8 @@ namespace DeskSpace
         private int _pendingConflictVk = 0;
         private List<string> _pendingConflictOtherIds = new List<string>();
         private string? _renamingDesktopId = null;
+        private string? _targetWeDesktopId = null;
+        private List<WallpaperEngineItem>? _cachedWeLibrary = null;
 
         #region Win32 Interop (Shell, Recycle Bin, Maximize WorkArea)
 
@@ -786,7 +896,8 @@ namespace DeskSpace
             return RenameModalOverlay.Visibility == Visibility.Visible ||
                    DeleteModalOverlay.Visibility == Visibility.Visible ||
                    ConflictModalOverlay.Visibility == Visibility.Visible ||
-                   UninstallModalOverlay.Visibility == Visibility.Visible;
+                   UninstallModalOverlay.Visibility == Visibility.Visible ||
+                   (WeModalOverlay != null && WeModalOverlay.Visibility == Visibility.Visible);
         }
 
         private void SetModalState(Grid overlay, bool open, Control? focusTarget = null)
@@ -1006,6 +1117,7 @@ namespace DeskSpace
                         Dispatcher.BeginInvoke(new Action(() =>
                         {
                             if (_isClosing) return;
+                            _previewBitmapCache.Clear();
                             _previewReloadTimer.Stop();
                             _previewReloadTimer.Start();
                         }));
@@ -1186,7 +1298,9 @@ namespace DeskSpace
         {
             _config.ShowPreviewIcons = (ChkShowPreviewIcons.IsChecked == true);
             _config.Save();
+            _previewBitmapCache.Clear();
             SendIpcCommand("refresh_previews");
+            PopulateDesktopCards();
         }
 
         private void ChkWallpaperEngine_Click(object sender, RoutedEventArgs e)
@@ -1236,14 +1350,14 @@ namespace DeskSpace
             if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
             {
                 TxtWeStatus.Text = isRu ? $"Обнаружен: {path}" : $"Found: {path}";
-                TxtWeStatus.Foreground = new SolidColorBrush(Color.FromRgb(34, 197, 94));
+                TxtWeStatus.Foreground = (Brush)FindResource("TextSecondaryBrush");
             }
             else
             {
                 TxtWeStatus.Text = isRu
                     ? "Файл не найден. Укажите путь к wallpaper64.exe вручную."
                     : "Executable not found. Please specify wallpaper64.exe manually.";
-                TxtWeStatus.Foreground = new SolidColorBrush(Color.FromRgb(239, 68, 68));
+                TxtWeStatus.Foreground = new SolidColorBrush(Color.FromRgb(248, 113, 113));
             }
         }
 
@@ -3102,43 +3216,7 @@ namespace DeskSpace
                         Header = isRu ? "Привязать живые обои (Wallpaper Engine)..." : "Set live wallpaper (Wallpaper Engine)...",
                         Icon = CreateMenuIcon("IconImage", accentBrush)
                     };
-                    miWe.Click += (s, e) =>
-                    {
-                        var liveDesk = _config.Desktops.FirstOrDefault(x => x.Id == deskId);
-                        if (liveDesk == null) return;
-
-                        string initialDir = AppConfig.GetWallpaperEngineWorkshopDir(_config.WallpaperEngineExe);
-
-                        var dlg = new Microsoft.Win32.OpenFileDialog
-                        {
-                            Title = isRu ? $"Живые обои для «{liveDesk.Name}»" : $"Live wallpaper for \"{liveDesk.Name}\"",
-                            Filter = isRu
-                                ? "Обои Wallpaper Engine (*.pkg;project.json;*.mp4;*.webm)|*.pkg;project.json;*.mp4;*.webm|Все файлы (*.*)|*.*"
-                                : "Wallpaper Engine Wallpapers (*.pkg;project.json;*.mp4;*.webm)|*.pkg;project.json;*.mp4;*.webm|All files (*.*)|*.*"
-                        };
-                        if (!string.IsNullOrEmpty(initialDir) && Directory.Exists(initialDir))
-                        {
-                            dlg.InitialDirectory = initialDir;
-                        }
-
-                        if (dlg.ShowDialog() == true && File.Exists(dlg.FileName))
-                        {
-                            var freshDesk = _config.Desktops.FirstOrDefault(x => x.Id == deskId);
-                            if (freshDesk == null) return;
-
-                            freshDesk.WallpaperEngineItem = dlg.FileName;
-                            _config.WallpaperEngineEnabled = true;
-                            ChkWallpaperEngine.IsChecked = true;
-                            if (string.IsNullOrWhiteSpace(_config.WallpaperEngineExe))
-                            {
-                                string det = AppConfig.DetectWallpaperEnginePath();
-                                if (!string.IsNullOrEmpty(det)) _config.WallpaperEngineExe = det;
-                            }
-                            _config.Save();
-                            SendIpcCommand("refresh_previews");
-                            PopulateDesktopCards();
-                        }
-                    };
+                    miWe.Click += (s, e) => OpenWallpaperEngineGalleryModal(deskId);
                     cm.Items.Add(miWe);
 
                     if (!string.IsNullOrWhiteSpace(d.WallpaperEngineItem))
@@ -3154,6 +3232,7 @@ namespace DeskSpace
                             if (freshDesk == null) return;
                             freshDesk.WallpaperEngineItem = "";
                             _config.Save();
+                            _previewBitmapCache.Clear();
                             SendIpcCommand("refresh_previews");
                             PopulateDesktopCards();
                         };
@@ -3297,6 +3376,311 @@ namespace DeskSpace
                 e.Handled = true;
             }
         }
+
+        #region Wallpaper Engine Gallery Modal
+
+        private void OpenWallpaperEngineGalleryModal(string desktopId)
+        {
+            var d = _config.Desktops.FirstOrDefault(x => x.Id == desktopId);
+            if (d == null) return;
+
+            _targetWeDesktopId = d.Id;
+            bool isRu = _config.Language == "ru";
+
+            TxtWeModalTitle.Text = isRu ? "Живые обои Wallpaper Engine" : "Wallpaper Engine Gallery";
+            TxtWeModalSubtitle.Text = isRu ? $"Рабочий стол: «{d.Name}»" : $"Workspace: \"{d.Name}\"";
+            TxtWeModalBrowseFile.Text = isRu ? "Выбрать файл..." : "Browse file...";
+            TxtWeModalClear.Text = isRu ? "Убрать живые обои" : "Remove live wallpaper";
+            TxtWeModalClose.Text = isRu ? "Закрыть" : "Close";
+            TxtWeSearchPlaceholder.Text = isRu ? "Поиск по названию..." : "Search wallpapers by title...";
+
+            BtnWeModalClear.Visibility = !string.IsNullOrWhiteSpace(d.WallpaperEngineItem)
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+
+            TxtWeSearch.Text = "";
+            SetModalState(WeModalOverlay, true, TxtWeSearch);
+
+            RefreshWeGalleryView();
+        }
+
+        private void CloseWallpaperEngineModal()
+        {
+            SetModalState(WeModalOverlay, false);
+            _targetWeDesktopId = null;
+        }
+
+        private void RefreshWeGalleryView()
+        {
+            if (_targetWeDesktopId == null) return;
+            var desk = _config.Desktops.FirstOrDefault(x => x.Id == _targetWeDesktopId);
+            string currentItem = desk?.WallpaperEngineItem ?? "";
+            string filter = TxtWeSearch?.Text?.Trim() ?? "";
+
+            if (_cachedWeLibrary != null)
+            {
+                RenderWeGalleryCards(_cachedWeLibrary, currentItem, filter);
+                return;
+            }
+
+            TxtWeEmptyNotice.Visibility = Visibility.Visible;
+            TxtWeEmptyNotice.Text = (_config.Language == "ru") ? "Загрузка обоев..." : "Loading wallpapers...";
+            WeGalleryWrapPanel.Children.Clear();
+
+            string weExe = _config.WallpaperEngineExe;
+            Task.Run(() =>
+            {
+                var items = AppConfig.DiscoverWallpapers(weExe);
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    _cachedWeLibrary = items;
+                    if (WeModalOverlay.Visibility == Visibility.Visible)
+                    {
+                        RenderWeGalleryCards(items, currentItem, filter);
+                    }
+                }));
+            });
+        }
+
+        private void RenderWeGalleryCards(List<WallpaperEngineItem> items, string currentItem, string filter)
+        {
+            WeGalleryWrapPanel.Children.Clear();
+            bool isRu = _config.Language == "ru";
+
+            var filtered = string.IsNullOrEmpty(filter)
+                ? items
+                : items.Where(x => x.Title.Contains(filter, StringComparison.OrdinalIgnoreCase)).ToList();
+
+            if (filtered.Count == 0)
+            {
+                TxtWeEmptyNotice.Visibility = Visibility.Visible;
+                TxtWeEmptyNotice.Text = isRu ? "Ничего не найдено." : "No wallpapers found.";
+                return;
+            }
+
+            TxtWeEmptyNotice.Visibility = Visibility.Collapsed;
+            var accentBrush = (Brush)FindResource("AccentBrush");
+            var cardDefaultBorder = new SolidColorBrush(Color.FromRgb(39, 47, 62));
+            var cardHoverBorder = new SolidColorBrush(Color.FromRgb(79, 94, 123));
+            var cardDefaultBg = new SolidColorBrush(Color.FromRgb(22, 26, 35));
+            var cardHoverBg = new SolidColorBrush(Color.FromRgb(30, 36, 50));
+            var cardSelectedBg = new SolidColorBrush(Color.FromRgb(24, 34, 50));
+            var textPrimary = (Brush)FindResource("TextPrimaryBrush");
+
+            foreach (var item in filtered)
+            {
+                bool isSelected = false;
+                if (!string.IsNullOrEmpty(currentItem))
+                {
+                    if (string.Equals(currentItem, item.ProjectJsonPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        isSelected = true;
+                    }
+                    else
+                    {
+                        string? d1 = System.IO.Path.GetDirectoryName(currentItem);
+                        string? d2 = System.IO.Path.GetDirectoryName(item.ProjectJsonPath);
+                        if (!string.IsNullOrEmpty(d1) && !string.IsNullOrEmpty(d2) &&
+                            string.Equals(d1, d2, StringComparison.OrdinalIgnoreCase))
+                        {
+                            isSelected = true;
+                        }
+                    }
+                }
+
+                var card = new Border
+                {
+                    Width = 162,
+                    Height = 130,
+                    Margin = new Thickness(6),
+                    CornerRadius = new CornerRadius(8),
+                    Background = isSelected ? cardSelectedBg : cardDefaultBg,
+                    BorderBrush = isSelected ? accentBrush : cardDefaultBorder,
+                    BorderThickness = new Thickness(isSelected ? 2 : 1.5),
+                    Cursor = Cursors.Hand
+                };
+
+                var grid = new Grid();
+                grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(88) });
+                grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(42) });
+
+                // Row 0: Preview thumbnail
+                var thumbBorder = new Border
+                {
+                    CornerRadius = new CornerRadius(7, 7, 0, 0),
+                    ClipToBounds = true,
+                    Background = new SolidColorBrush(Color.FromRgb(16, 20, 28))
+                };
+
+                if (!string.IsNullOrEmpty(item.PreviewImagePath) && File.Exists(item.PreviewImagePath))
+                {
+                    try
+                    {
+                        var bi = new BitmapImage();
+                        bi.BeginInit();
+                        bi.UriSource = new Uri(item.PreviewImagePath);
+                        bi.DecodePixelWidth = 240;
+                        bi.CacheOption = BitmapCacheOption.OnLoad;
+                        bi.EndInit();
+                        bi.Freeze();
+                        thumbBorder.Child = new Image
+                        {
+                            Source = bi,
+                            Stretch = Stretch.UniformToFill
+                        };
+                    }
+                    catch { }
+                }
+
+                grid.Children.Add(thumbBorder);
+
+                // If selected, checkmark badge in corner
+                if (isSelected)
+                {
+                    var badge = new Border
+                    {
+                        Width = 20,
+                        Height = 20,
+                        CornerRadius = new CornerRadius(4),
+                        Background = accentBrush,
+                        HorizontalAlignment = HorizontalAlignment.Right,
+                        VerticalAlignment = VerticalAlignment.Top,
+                        Margin = new Thickness(0, 6, 6, 0)
+                    };
+                    badge.Child = new System.Windows.Shapes.Path
+                    {
+                        Data = (Geometry)FindResource("IconCheck"),
+                        Fill = Brushes.White,
+                        Width = 10,
+                        Height = 10,
+                        Stretch = Stretch.Uniform,
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        VerticalAlignment = VerticalAlignment.Center
+                    };
+                    grid.Children.Add(badge);
+                }
+
+                // Row 1: Title
+                var titleText = new TextBlock
+                {
+                    Text = item.Title,
+                    FontSize = 11.5,
+                    FontWeight = isSelected ? FontWeights.SemiBold : FontWeights.Normal,
+                    Foreground = isSelected ? accentBrush : textPrimary,
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    TextWrapping = TextWrapping.Wrap,
+                    MaxHeight = 32,
+                    Margin = new Thickness(8, 4, 8, 4),
+                    VerticalAlignment = VerticalAlignment.Center,
+                    ToolTip = item.Title
+                };
+                Grid.SetRow(titleText, 1);
+                grid.Children.Add(titleText);
+
+                card.Child = grid;
+
+                if (!isSelected)
+                {
+                    card.MouseEnter += (s, e) =>
+                    {
+                        card.BorderBrush = cardHoverBorder;
+                        card.Background = cardHoverBg;
+                    };
+                    card.MouseLeave += (s, e) =>
+                    {
+                        card.BorderBrush = cardDefaultBorder;
+                        card.Background = cardDefaultBg;
+                    };
+                }
+
+                string pjPath = item.ProjectJsonPath;
+                card.MouseDown += (s, e) =>
+                {
+                    if (e.ChangedButton == MouseButton.Left && _targetWeDesktopId != null)
+                    {
+                        SelectWallpaperForDesktop(_targetWeDesktopId, pjPath);
+                    }
+                };
+
+                WeGalleryWrapPanel.Children.Add(card);
+            }
+        }
+
+        private void SelectWallpaperForDesktop(string desktopId, string path)
+        {
+            var freshDesk = _config.Desktops.FirstOrDefault(x => x.Id == desktopId);
+            if (freshDesk != null)
+            {
+                freshDesk.WallpaperEngineItem = path;
+                _config.WallpaperEngineEnabled = true;
+                ChkWallpaperEngine.IsChecked = true;
+                if (string.IsNullOrWhiteSpace(_config.WallpaperEngineExe))
+                {
+                    string det = AppConfig.DetectWallpaperEnginePath();
+                    if (!string.IsNullOrEmpty(det)) _config.WallpaperEngineExe = det;
+                }
+                _config.Save();
+                _previewBitmapCache.Clear();
+                SendIpcCommand("refresh_previews");
+                CloseWallpaperEngineModal();
+                PopulateDesktopCards();
+            }
+        }
+
+        private void TxtWeSearch_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            TxtWeSearchPlaceholder.Visibility = string.IsNullOrEmpty(TxtWeSearch.Text)
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+
+            if (_cachedWeLibrary != null && _targetWeDesktopId != null)
+            {
+                var desk = _config.Desktops.FirstOrDefault(x => x.Id == _targetWeDesktopId);
+                RenderWeGalleryCards(_cachedWeLibrary, desk?.WallpaperEngineItem ?? "", TxtWeSearch.Text.Trim());
+            }
+        }
+
+        private void BtnWeModalBrowseFile_Click(object sender, RoutedEventArgs e)
+        {
+            if (_targetWeDesktopId == null) return;
+            bool isRu = _config.Language == "ru";
+            var dlg = new Microsoft.Win32.OpenFileDialog
+            {
+                Title = isRu ? "Выберите обои Wallpaper Engine" : "Select Wallpaper Engine wallpaper",
+                Filter = isRu
+                    ? "Обои Wallpaper Engine (*.pkg;project.json;*.mp4;*.webm)|*.pkg;project.json;*.mp4;*.webm|Все файлы (*.*)|*.*"
+                    : "Wallpaper Engine Wallpapers (*.pkg;project.json;*.mp4;*.webm)|*.pkg;project.json;*.mp4;*.webm|All files (*.*)|*.*"
+            };
+            string wsDir = AppConfig.GetWallpaperEngineWorkshopDir(_config.WallpaperEngineExe);
+            if (!string.IsNullOrEmpty(wsDir) && Directory.Exists(wsDir)) dlg.InitialDirectory = wsDir;
+
+            if (dlg.ShowDialog() == true && File.Exists(dlg.FileName))
+            {
+                SelectWallpaperForDesktop(_targetWeDesktopId, dlg.FileName);
+            }
+        }
+
+        private void BtnWeModalClose_Click(object sender, RoutedEventArgs e)
+        {
+            CloseWallpaperEngineModal();
+        }
+
+        private void BtnWeModalClear_Click(object sender, RoutedEventArgs e)
+        {
+            if (_targetWeDesktopId == null) return;
+            var freshDesk = _config.Desktops.FirstOrDefault(x => x.Id == _targetWeDesktopId);
+            if (freshDesk != null)
+            {
+                freshDesk.WallpaperEngineItem = "";
+                _config.Save();
+                _previewBitmapCache.Clear();
+                SendIpcCommand("refresh_previews");
+                CloseWallpaperEngineModal();
+                PopulateDesktopCards();
+            }
+        }
+
+        #endregion
 
         #endregion
     }

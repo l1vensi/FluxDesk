@@ -460,7 +460,12 @@ namespace WorkSpace
             }
             else if (text.Equals("refresh_previews", StringComparison.OrdinalIgnoreCase))
             {
-                _switcher.BeginInvoke(new Action(() => RefreshAllPreviewsAsync()));
+                _switcher.BeginInvoke(new Action(() =>
+                {
+                    ReloadConfigOnUiThread(suppressPreviewRefresh: true);
+                    _switcher.ClearPreviewCache();
+                    RefreshAllPreviewsAsync();
+                }));
             }
         }
 

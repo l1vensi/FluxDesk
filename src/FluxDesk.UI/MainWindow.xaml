@@ -707,6 +707,103 @@
                     </StackPanel>
                 </Border>
             </Grid>
+
+            <!-- Modal Overlay for Wallpaper Engine Visual Picker -->
+            <Grid x:Name="WeModalOverlay" Grid.RowSpan="2" Background="#B8000000" Visibility="Collapsed" KeyboardNavigation.TabNavigation="Cycle">
+                <Border Background="{StaticResource CardBrush}"
+                        BorderBrush="{StaticResource AccentBorderBrush}"
+                        BorderThickness="1.5"
+                        CornerRadius="12"
+                        Width="760"
+                        MaxHeight="540"
+                        VerticalAlignment="Center"
+                        HorizontalAlignment="Center"
+                        Padding="22">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Header -->
+                        <Grid Grid.Row="0" Margin="0,0,0,14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Border Background="{StaticResource AccentTintBrush}" Width="36" Height="36" CornerRadius="8" Margin="0,0,12,0">
+                                    <Path Data="{StaticResource IconImage}" Fill="{StaticResource AccentBrush}" Width="16" Height="16" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock x:Name="TxtWeModalTitle" Text="Wallpaper Engine Gallery" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                    <TextBlock x:Name="TxtWeModalSubtitle" Text="Select a live wallpaper for this workspace" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                </StackPanel>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Button x:Name="BtnWeModalBrowseFile" Height="32" Padding="12,0" Margin="0,0,8,0" Style="{StaticResource SecondaryButtonStyle}" Click="BtnWeModalBrowseFile_Click">
+                                    <TextBlock x:Name="TxtWeModalBrowseFile" Text="Browse file..." FontSize="12"/>
+                                </Button>
+                                <Button x:Name="BtnWeModalCloseX" Width="32" Height="32" Click="BtnWeModalClose_Click" Style="{StaticResource WindowCloseButtonStyle}">
+                                    <Path Data="{StaticResource IconClose}" Fill="{StaticResource TextSecondaryBrush}" Width="10" Height="10" Stretch="Uniform"/>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Search Box -->
+                        <Border Grid.Row="1" Background="{StaticResource InputBgBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,0,0,12">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Path Data="{StaticResource IconSearch}" Fill="{StaticResource TextSecondaryBrush}" Width="13" Height="13" Stretch="Uniform" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                <TextBox x:Name="TxtWeSearch"
+                                         Grid.Column="1"
+                                         Background="Transparent"
+                                         BorderThickness="0"
+                                         Foreground="{StaticResource TextPrimaryBrush}"
+                                         FontSize="13"
+                                         CaretBrush="{StaticResource AccentBrush}"
+                                         TextChanged="TxtWeSearch_TextChanged"/>
+                                <TextBlock x:Name="TxtWeSearchPlaceholder"
+                                           Grid.Column="1"
+                                           Text="Search wallpapers by title..."
+                                           FontSize="13"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           IsHitTestVisible="False"
+                                           VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Wallpapers Gallery Scroll Area -->
+                        <Border Grid.Row="2" Background="#11141B" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10" MinHeight="260" MaxHeight="320">
+                            <Grid>
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                    <WrapPanel x:Name="WeGalleryWrapPanel" HorizontalAlignment="Center"/>
+                                </ScrollViewer>
+                                <TextBlock x:Name="TxtWeEmptyNotice" Text="No wallpapers found." FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Footer Actions -->
+                        <Grid Grid.Row="3" Margin="0,14,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Button x:Name="BtnWeModalClear" Height="34" Padding="14,0" Style="{StaticResource SecondaryButtonStyle}" Click="BtnWeModalClear_Click" Visibility="Collapsed">
+                                <TextBlock x:Name="TxtWeModalClear" Text="Remove live wallpaper" FontSize="12.5"/>
+                            </Button>
+                            <Button x:Name="BtnWeModalClose" Grid.Column="1" Height="34" Padding="20,0" Style="{StaticResource SecondaryButtonStyle}" Click="BtnWeModalClose_Click">
+                                <TextBlock x:Name="TxtWeModalClose" Text="Cancel" FontSize="12.5"/>
+                            </Button>
+                        </Grid>
+                    </Grid>
+                </Border>
+            </Grid>
         </Grid>
     </Border>
 </Window>
