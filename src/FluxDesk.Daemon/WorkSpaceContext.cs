@@ -116,6 +116,7 @@ namespace WorkSpace
 
                 // Register in Windows "Apps & Features" so user can uninstall safely from Windows Settings
                 ShellHelper.RegisterUninstallEntry(AppConfig.FindUiExecutable());
+                ShellHelper.EnsureStartMenuShortcut(AppConfig.FindUiExecutable());
 
                 if (_config.RestorePrimaryOnShutdown && _config.CurrentIndex != 0 && _config.Desktops.Count > 0)
                 {

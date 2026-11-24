@@ -935,6 +935,7 @@ namespace DeskSpace
             SetupConfigWatcher();
             SetupPreviewWatcher();
             EnsureBackgroundDaemonRunning();
+            EnsureStartMenuShortcut();
             RequestPreviewRefresh();
 
             Activated += (s, e) =>
@@ -2625,6 +2626,9 @@ namespace DeskSpace
                     Registry.CurrentUser.DeleteSubKeyTree(@"Software\FluxDesk", false);
                     // Remove "Apps & Features" entry
                     Registry.CurrentUser.DeleteSubKeyTree(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\FluxDesk", false);
+
+                    string startMenuLnk = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "FluxDesk.lnk");
+                    if (File.Exists(startMenuLnk)) File.Delete(startMenuLnk);
                 }
                 catch { }
 
@@ -2720,6 +2724,29 @@ namespace DeskSpace
             catch { }
 
             Application.Current.Shutdown();
+        }
+
+        private void EnsureStartMenuShortcut()
+        {
+            try
+            {
+                string exePath = Environment.ProcessPath ?? "";
+                if (string.IsNullOrWhiteSpace(exePath) || !File.Exists(exePath)) return;
+                string programsFolder = Environment.GetFolderPath(Environment.SpecialFolder.Programs);
+                if (!Directory.Exists(programsFolder)) return;
+                string shortcutPath = System.IO.Path.Combine(programsFolder, "FluxDesk.lnk");
+                if (File.Exists(shortcutPath)) return;
+
+                Type? shellType = Type.GetTypeFromProgID("WScript.Shell");
+                if (shellType == null) return;
+                dynamic shell = Activator.CreateInstance(shellType)!;
+                var shortcut = shell.CreateShortcut(shortcutPath);
+                shortcut.TargetPath = exePath;
+                shortcut.WorkingDirectory = System.IO.Path.GetDirectoryName(exePath) ?? "";
+                shortcut.Description = "FluxDesk - Desktop Workspace Manager";
+                shortcut.Save();
+            }
+            catch { }
         }
 
         #endregion

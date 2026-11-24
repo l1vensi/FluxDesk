@@ -231,5 +231,40 @@ namespace WorkSpace
             }
             catch { }
         }
+
+        /// <summary>Creates a shortcut in Start Menu Programs so FluxDesk is searchable in Windows Start.</summary>
+        public static void EnsureStartMenuShortcut(string? uiExePath)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(uiExePath) || !File.Exists(uiExePath)) return;
+                string programsFolder = Environment.GetFolderPath(Environment.SpecialFolder.Programs);
+                if (!Directory.Exists(programsFolder)) return;
+                string shortcutPath = Path.Combine(programsFolder, "FluxDesk.lnk");
+                if (File.Exists(shortcutPath)) return;
+
+                Type? shellType = Type.GetTypeFromProgID("WScript.Shell");
+                if (shellType == null) return;
+                dynamic shell = Activator.CreateInstance(shellType)!;
+                var shortcut = shell.CreateShortcut(shortcutPath);
+                shortcut.TargetPath = uiExePath;
+                shortcut.WorkingDirectory = Path.GetDirectoryName(uiExePath) ?? "";
+                shortcut.Description = "FluxDesk - Desktop Workspace Manager";
+                shortcut.Save();
+            }
+            catch { }
+        }
+
+        /// <summary>Removes the Start Menu shortcut.</summary>
+        public static void RemoveStartMenuShortcut()
+        {
+            try
+            {
+                string shortcutPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.Programs), "FluxDesk.lnk");
+                if (File.Exists(shortcutPath)) File.Delete(shortcutPath);
+            }
+            catch { }
+        }
     }
 }
