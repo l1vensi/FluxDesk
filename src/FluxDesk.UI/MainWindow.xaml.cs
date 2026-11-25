@@ -4144,7 +4144,8 @@ namespace DeskSpace
         #region Quick Switcher (Alt + W) Visual Mini-Screen Editor
 
         private List<string> _editingQsIds = new List<string>();
-        private Point _qsDragStartPoint;
+        private double _qsDragStartX;
+        private Border? _qsDraggingCard;
         private string? _qsDraggingId;
 
         private void BtnConfigureQuickSwitcher_Click(object sender, RoutedEventArgs e)
@@ -4163,11 +4164,8 @@ namespace DeskSpace
 
             TxtQsModalTitle.Text = isRu ? "Быстрое меню" : "Quick Switcher";
             TxtQsModalSub.Text = isRu
-                ? "Нажмите на столы ниже, чтобы добавить или убрать их. Перетаскивайте карточки на экране для смены порядка."
-                : "Click workspaces below to add or remove them. Drag cards on the preview monitor to reorder.";
-            TxtQsMiniScreenBadge.Text = isRu
-                ? "ЖИВОЙ ПРЕДПРОСМОТР — ПЕРЕТАСКИВАЙТЕ КАРТОЧКИ МЫШКОЙ"
-                : "LIVE MONITOR PREVIEW — DRAG CARDS TO REORDER";
+                ? "Выберите до 9 столов ниже. Карточки на экране можно перетаскивать мышкой."
+                : "Select up to 9 workspaces below. Drag cards on the preview monitor to reorder.";
             TxtQsLimitNotice.Text = isRu
                 ? "Достигнут лимит: максимум 9 рабочих столов."
                 : "Limit reached: maximum 9 workspaces.";
@@ -4205,7 +4203,28 @@ namespace DeskSpace
                 ? $"Выбрано: {_editingQsIds.Count} / 9"
                 : $"Selected: {_editingQsIds.Count} / 9";
 
-            // 1. Render Draggable Live Mini-Screen Cards
+            RenderMiniScreenCards();
+            RenderQsTileGrid();
+        }
+
+        private void UpdateMiniScreenCardLabels()
+        {
+            for (int idx = 0; idx < QsMiniScreenCardsPanel.Children.Count; idx++)
+            {
+                if (QsMiniScreenCardsPanel.Children[idx] is Border card)
+                {
+                    card.Margin = new Thickness(idx == 0 ? 0 : 8, 0, 0, 0);
+                    if (card.Tag is ValueTuple<string, string, TextBlock> meta)
+                    {
+                        meta.Item3.Text = $"{idx + 1}. {meta.Item2}";
+                    }
+                }
+            }
+        }
+
+        private void RenderMiniScreenCards()
+        {
+            bool isRu = _config.Language == "ru";
             QsMiniScreenCardsPanel.Children.Clear();
             var accentBrush = (Brush)FindResource("AccentBrush");
             var textPrimary = (Brush)FindResource("TextPrimaryBrush");
@@ -4216,186 +4235,227 @@ namespace DeskSpace
                 QsMiniScreenCardsPanel.Children.Add(new TextBlock
                 {
                     Text = isRu ? "Нажмите на столы ниже, чтобы добавить их" : "Click workspaces below to add them",
-                    FontSize = 11.5,
+                    FontSize = 12,
                     Foreground = (Brush)FindResource("TextSecondaryBrush"),
-                    Margin = new Thickness(16, 14, 16, 14)
+                    Margin = new Thickness(18, 16, 18, 16)
                 });
+                return;
             }
-            else
+
+            const double cardW = 122.0;
+            const double cardH = 72.0;
+            const double cardGap = 8.0;
+            const double step = cardW + cardGap;
+
+            string activeId = (_config.CurrentIndex >= 0 && _config.CurrentIndex < _config.Desktops.Count)
+                ? _config.Desktops[_config.CurrentIndex].Id
+                : "";
+
+            for (int i = 0; i < count; i++)
             {
-                double miniCardW = count <= 5 ? 108 : Math.Max(74, (760.0 - (count - 1) * 6) / count);
-                double miniCardH = Math.Round(miniCardW * (104.0 / 178.0));
+                string id = _editingQsIds[i];
+                var d = _config.Desktops.First(x => x.Id == id);
+                bool isActive = (d.Id == activeId);
+                var defaultBorderBrush = isActive ? accentBrush : new SolidColorBrush(Color.FromRgb(65, 68, 78));
 
-                string activeId = (_config.CurrentIndex >= 0 && _config.CurrentIndex < _config.Desktops.Count)
-                    ? _config.Desktops[_config.CurrentIndex].Id
-                    : "";
+                var scaleTransform = new ScaleTransform(1.0, 1.0);
+                var translateTransform = new TranslateTransform(0, 0);
+                var transformGroup = new TransformGroup();
+                transformGroup.Children.Add(scaleTransform);
+                transformGroup.Children.Add(translateTransform);
 
-                for (int i = 0; i < count; i++)
+                var miniCard = new Border
                 {
-                    string id = _editingQsIds[i];
-                    var d = _config.Desktops.First(x => x.Id == id);
-                    bool isActive = (d.Id == activeId);
-                    var defaultBorderBrush = isActive ? accentBrush : new SolidColorBrush(Color.FromRgb(65, 68, 78));
+                    Width = cardW,
+                    Height = cardH,
+                    Margin = new Thickness(i == 0 ? 0 : cardGap, 0, 0, 0),
+                    CornerRadius = new CornerRadius(6),
+                    Background = new SolidColorBrush(Color.FromRgb(34, 36, 42)),
+                    BorderBrush = defaultBorderBrush,
+                    BorderThickness = new Thickness(isActive ? 1.8 : 1),
+                    ClipToBounds = true,
+                    Cursor = Cursors.Hand,
+                    RenderTransformOrigin = new Point(0.5, 0.5),
+                    RenderTransform = transformGroup
+                };
 
-                    var miniCard = new Border
+                var cardGrid = new Grid();
+                var bmp = TryLoadPreviewBitmap(d.Id);
+                if (bmp != null)
+                {
+                    cardGrid.Children.Add(new Image
                     {
-                        Width = miniCardW,
-                        Height = miniCardH,
-                        Margin = new Thickness(i == 0 ? 0 : 6, 0, 0, 0),
-                        CornerRadius = new CornerRadius(5),
-                        Background = new SolidColorBrush(Color.FromRgb(34, 36, 42)),
-                        BorderBrush = defaultBorderBrush,
-                        BorderThickness = new Thickness(isActive ? 1.8 : 1),
-                        ClipToBounds = true,
-                        Cursor = Cursors.SizeAll,
-                        AllowDrop = true
-                    };
-
-                    var cardGrid = new Grid();
-                    var bmp = TryLoadPreviewBitmap(d.Id);
-                    if (bmp != null)
-                    {
-                        cardGrid.Children.Add(new Image
-                        {
-                            Source = bmp,
-                            Stretch = Stretch.UniformToFill,
-                            Margin = new Thickness(2)
-                        });
-                    }
-                    else
-                    {
-                        cardGrid.Children.Add(new Border
-                        {
-                            Margin = new Thickness(2),
-                            CornerRadius = new CornerRadius(3),
-                            Background = new LinearGradientBrush(
-                                Color.FromRgb(20, 40, 75),
-                                Color.FromRgb(10, 20, 40),
-                                45)
-                        });
-                    }
-
-                    // Bottom bar with slot number & name
-                    var labelBar = new Border
-                    {
-                        VerticalAlignment = VerticalAlignment.Bottom,
-                        Background = new SolidColorBrush(Color.FromArgb(205, 13, 17, 23)),
-                        Padding = new Thickness(4, 2, 4, 2)
-                    };
-                    labelBar.Child = new TextBlock
-                    {
-                        Text = $"{i + 1}. {d.Name}",
-                        FontSize = count <= 6 ? 9.5 : 8.5,
-                        FontWeight = FontWeights.SemiBold,
-                        Foreground = isActive ? accentBrush : textPrimary,
-                        TextTrimming = TextTrimming.CharacterEllipsis
-                    };
-                    cardGrid.Children.Add(labelBar);
-
-                    // Compact remove button in top-right on hover
-                    var btnRemove = new Button
-                    {
-                        Content = "x",
-                        Width = 17,
-                        Height = 17,
-                        Padding = new Thickness(0),
-                        FontSize = 9.5,
-                        FontWeight = FontWeights.Bold,
-                        Foreground = new SolidColorBrush(Color.FromRgb(248, 113, 113)),
-                        Background = new SolidColorBrush(Color.FromArgb(220, 15, 20, 30)),
-                        BorderThickness = new Thickness(0),
-                        HorizontalAlignment = HorizontalAlignment.Right,
-                        VerticalAlignment = VerticalAlignment.Top,
-                        Margin = new Thickness(0, 3, 3, 0),
-                        Cursor = Cursors.Hand,
-                        Visibility = Visibility.Collapsed
-                    };
-                    string capId = d.Id;
-                    btnRemove.Click += (s, ev) =>
-                    {
-                        ev.Handled = true;
-                        _editingQsIds.Remove(capId);
-                        TxtQsLimitNotice.Visibility = Visibility.Collapsed;
-                        SaveQsSelection();
-                        RefreshQsConfigView();
-                    };
-                    cardGrid.Children.Add(btnRemove);
-
-                    miniCard.MouseEnter += (s, ev) => btnRemove.Visibility = Visibility.Visible;
-                    miniCard.MouseLeave += (s, ev) => btnRemove.Visibility = Visibility.Collapsed;
-
-                    // Drag & Drop handlers for reordering cards directly with mouse
-                    miniCard.PreviewMouseLeftButtonDown += (s, ev) =>
-                    {
-                        if (ev.OriginalSource is DependencyObject dep)
-                        {
-                            var cur = dep;
-                            while (cur != null && cur != miniCard)
-                            {
-                                if (cur == btnRemove) return;
-                                cur = VisualTreeHelper.GetParent(cur);
-                            }
-                        }
-                        _qsDragStartPoint = ev.GetPosition(null);
-                        _qsDraggingId = capId;
-                    };
-
-                    miniCard.MouseMove += (s, ev) =>
-                    {
-                        if (ev.LeftButton == MouseButtonState.Pressed && !string.IsNullOrEmpty(_qsDraggingId))
-                        {
-                            Vector diff = _qsDragStartPoint - ev.GetPosition(null);
-                            if (Math.Abs(diff.X) > SystemParameters.MinimumHorizontalDragDistance ||
-                                Math.Abs(diff.Y) > SystemParameters.MinimumVerticalDragDistance)
-                            {
-                                string dragId = _qsDraggingId;
-                                _qsDraggingId = null;
-                                DragDrop.DoDragDrop(miniCard, dragId, DragDropEffects.Move);
-                            }
-                        }
-                    };
-
-                    miniCard.DragOver += (s, ev) =>
-                    {
-                        if (ev.Data.GetDataPresent(typeof(string)))
-                        {
-                            ev.Effects = DragDropEffects.Move;
-                            miniCard.BorderBrush = accentBrush;
-                            ev.Handled = true;
-                        }
-                    };
-
-                    miniCard.DragLeave += (s, ev) =>
-                    {
-                        miniCard.BorderBrush = defaultBorderBrush;
-                    };
-
-                    miniCard.Drop += (s, ev) =>
-                    {
-                        miniCard.BorderBrush = defaultBorderBrush;
-                        if (ev.Data.GetDataPresent(typeof(string)))
-                        {
-                            string sourceId = (string)ev.Data.GetData(typeof(string))!;
-                            int fromIdx = _editingQsIds.IndexOf(sourceId);
-                            int toIdx = _editingQsIds.IndexOf(capId);
-                            if (fromIdx >= 0 && toIdx >= 0 && fromIdx != toIdx)
-                            {
-                                _editingQsIds.RemoveAt(fromIdx);
-                                _editingQsIds.Insert(toIdx, sourceId);
-                                SaveQsSelection();
-                                RefreshQsConfigView();
-                            }
-                            ev.Handled = true;
-                        }
-                    };
-
-                    miniCard.Child = cardGrid;
-                    QsMiniScreenCardsPanel.Children.Add(miniCard);
+                        Source = bmp,
+                        Stretch = Stretch.UniformToFill,
+                        Margin = new Thickness(2)
+                    });
                 }
-            }
+                else
+                {
+                    cardGrid.Children.Add(new Border
+                    {
+                        Margin = new Thickness(2),
+                        CornerRadius = new CornerRadius(4),
+                        Background = new LinearGradientBrush(
+                            Color.FromRgb(20, 40, 75),
+                            Color.FromRgb(10, 20, 40),
+                            45)
+                    });
+                }
 
-            // 2. Render Clean 3-Column Visual Tile Grid of All Workspaces
+                var labelText = new TextBlock
+                {
+                    Text = $"{i + 1}. {d.Name}",
+                    FontSize = 10,
+                    FontWeight = FontWeights.SemiBold,
+                    Foreground = isActive ? accentBrush : textPrimary,
+                    TextTrimming = TextTrimming.CharacterEllipsis
+                };
+                var labelBar = new Border
+                {
+                    VerticalAlignment = VerticalAlignment.Bottom,
+                    Background = new SolidColorBrush(Color.FromArgb(210, 13, 17, 23)),
+                    Padding = new Thickness(5, 2.5, 5, 2.5),
+                    Child = labelText
+                };
+                cardGrid.Children.Add(labelBar);
+                miniCard.Tag = (d.Id, d.Name, labelText);
+
+                var btnRemove = new Button
+                {
+                    Content = "x",
+                    Width = 18,
+                    Height = 18,
+                    Padding = new Thickness(0),
+                    FontSize = 10,
+                    FontWeight = FontWeights.Bold,
+                    Foreground = new SolidColorBrush(Color.FromRgb(248, 113, 113)),
+                    Background = new SolidColorBrush(Color.FromArgb(225, 15, 20, 30)),
+                    BorderThickness = new Thickness(0),
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    VerticalAlignment = VerticalAlignment.Top,
+                    Margin = new Thickness(0, 3, 3, 0),
+                    Cursor = Cursors.Hand,
+                    Visibility = Visibility.Collapsed
+                };
+                string capId = d.Id;
+                btnRemove.Click += (s, ev) =>
+                {
+                    ev.Handled = true;
+                    _editingQsIds.Remove(capId);
+                    TxtQsLimitNotice.Visibility = Visibility.Collapsed;
+                    SaveQsSelection();
+                    RefreshQsConfigView();
+                };
+                cardGrid.Children.Add(btnRemove);
+
+                miniCard.MouseEnter += (s, ev) =>
+                {
+                    if (_qsDraggingCard == null) btnRemove.Visibility = Visibility.Visible;
+                };
+                miniCard.MouseLeave += (s, ev) =>
+                {
+                    if (_qsDraggingCard != miniCard) btnRemove.Visibility = Visibility.Collapsed;
+                };
+
+                // Real-time interactive mouse drag (card lifts up and slides smoothly with cursor)
+                miniCard.PreviewMouseLeftButtonDown += (s, ev) =>
+                {
+                    if (ev.OriginalSource is DependencyObject dep)
+                    {
+                        var cur = dep;
+                        while (cur != null && cur != miniCard)
+                        {
+                            if (cur == btnRemove) return;
+                            cur = VisualTreeHelper.GetParent(cur);
+                        }
+                    }
+
+                    _qsDraggingCard = miniCard;
+                    _qsDraggingId = capId;
+                    _qsDragStartX = ev.GetPosition(QsMiniScreenCardsPanel).X;
+                    btnRemove.Visibility = Visibility.Collapsed;
+
+                    Panel.SetZIndex(miniCard, 100);
+                    miniCard.BorderBrush = accentBrush;
+                    miniCard.Cursor = Cursors.SizeAll;
+                    miniCard.Effect = new System.Windows.Media.Effects.DropShadowEffect
+                    {
+                        BlurRadius = 14,
+                        ShadowDepth = 4,
+                        Opacity = 0.75,
+                        Color = Colors.Black
+                    };
+                    scaleTransform.ScaleX = 1.07;
+                    scaleTransform.ScaleY = 1.07;
+                    miniCard.CaptureMouse();
+                    ev.Handled = true;
+                };
+
+                miniCard.MouseMove += (s, ev) =>
+                {
+                    if (_qsDraggingCard != miniCard || string.IsNullOrEmpty(_qsDraggingId)) return;
+
+                    double curX = ev.GetPosition(QsMiniScreenCardsPanel).X;
+                    double dx = curX - _qsDragStartX;
+                    translateTransform.X = dx;
+
+                    int curIdx = _editingQsIds.IndexOf(_qsDraggingId);
+                    if (curIdx < 0) return;
+
+                    if (dx > step * 0.55 && curIdx < _editingQsIds.Count - 1)
+                    {
+                        (_editingQsIds[curIdx], _editingQsIds[curIdx + 1]) = (_editingQsIds[curIdx + 1], _editingQsIds[curIdx]);
+                        QsMiniScreenCardsPanel.Children.RemoveAt(curIdx);
+                        QsMiniScreenCardsPanel.Children.Insert(curIdx + 1, miniCard);
+                        _qsDragStartX += step;
+                        translateTransform.X = curX - _qsDragStartX;
+                        UpdateMiniScreenCardLabels();
+                    }
+                    else if (dx < -step * 0.55 && curIdx > 0)
+                    {
+                        (_editingQsIds[curIdx], _editingQsIds[curIdx - 1]) = (_editingQsIds[curIdx - 1], _editingQsIds[curIdx]);
+                        QsMiniScreenCardsPanel.Children.RemoveAt(curIdx);
+                        QsMiniScreenCardsPanel.Children.Insert(curIdx - 1, miniCard);
+                        _qsDragStartX -= step;
+                        translateTransform.X = curX - _qsDragStartX;
+                        UpdateMiniScreenCardLabels();
+                    }
+                };
+
+                void EndCardDrag()
+                {
+                    if (_qsDraggingCard != miniCard) return;
+                    _qsDraggingCard = null;
+                    _qsDraggingId = null;
+
+                    miniCard.ReleaseMouseCapture();
+                    Panel.SetZIndex(miniCard, 0);
+                    miniCard.BorderBrush = defaultBorderBrush;
+                    miniCard.Cursor = Cursors.Hand;
+                    miniCard.Effect = null;
+                    scaleTransform.ScaleX = 1.0;
+                    scaleTransform.ScaleY = 1.0;
+                    translateTransform.X = 0;
+
+                    SaveQsSelection();
+                    RenderQsTileGrid();
+                }
+
+                miniCard.MouseLeftButtonUp += (s, ev) => EndCardDrag();
+                miniCard.LostMouseCapture += (s, ev) => EndCardDrag();
+
+                miniCard.Child = cardGrid;
+                QsMiniScreenCardsPanel.Children.Add(miniCard);
+            }
+        }
+
+        private void RenderQsTileGrid()
+        {
+            bool isRu = _config.Language == "ru";
             QsConfigListPanel.Children.Clear();
+            var accentBrush = (Brush)FindResource("AccentBrush");
+            var textPrimary = (Brush)FindResource("TextPrimaryBrush");
             var secondaryBrush = (Brush)FindResource("TextSecondaryBrush");
             var cardBorder = (Brush)FindResource("BorderBrush");
             var hoverBorder = (Brush)FindResource("BorderHoverBrush");

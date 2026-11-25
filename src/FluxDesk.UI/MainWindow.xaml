@@ -591,9 +591,9 @@
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <StackPanel VerticalAlignment="Center">
+                            <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
                                 <TextBlock x:Name="TxtQsModalTitle" Text="Quick Switcher" FontSize="26" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
-                                <TextBlock x:Name="TxtQsModalSub" Text="Click workspaces below to add or remove them, and drag cards on the monitor to reorder." FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,4,0,0"/>
+                                <TextBlock x:Name="TxtQsModalSub" Text="Select up to 9 workspaces below and drag cards on the monitor to reorder." FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,4,0,0"/>
                             </StackPanel>
                             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                                 <Border Background="{StaticResource AccentTintBrush}" BorderBrush="{StaticResource AccentBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,7" Margin="0,0,10,0" VerticalAlignment="Center">
@@ -617,14 +617,11 @@
                                         </LinearGradientBrush>
                                     </Grid.Background>
 
-                                    <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12,10,0,0" Background="#7A0D1117" CornerRadius="5" Padding="8,3">
-                                        <TextBlock x:Name="TxtQsMiniScreenBadge" Text="LIVE MONITOR PREVIEW — DRAG CARDS TO REORDER" FontSize="10" FontWeight="Bold" Foreground="#9FB2C9"/>
-                                    </Border>
-
-                                    <Border HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="16,0,16,30"
-                                            Background="#E81C1D22" BorderBrush="#41444E" BorderThickness="1.2" CornerRadius="10" Padding="8">
-                                        <StackPanel x:Name="QsMiniScreenCardsPanel" Orientation="Horizontal" HorizontalAlignment="Center"/>
-                                    </Border>
+                                    <Viewbox Stretch="Uniform" StretchDirection="DownOnly" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="18,12,18,30">
+                                        <Border Background="#E81C1D22" BorderBrush="#41444E" BorderThickness="1.2" CornerRadius="10" Padding="8">
+                                            <StackPanel x:Name="QsMiniScreenCardsPanel" Orientation="Horizontal" HorizontalAlignment="Center"/>
+                                        </Border>
+                                    </Viewbox>
 
                                     <Border VerticalAlignment="Bottom" Height="22" Background="#D90F141D" BorderBrush="#222D3D" BorderThickness="0,1,0,0">
                                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
