@@ -10,7 +10,9 @@
 
 ## Demo
 
-<video src="https://github.com/l1vensi/FluxDesk/raw/main/assets/demo.mp4" controls width="100%"></video>
+![FluxDesk Demo](assets/demo.gif)
+
+[Watch full-resolution video (MP4)](https://github.com/l1vensi/FluxDesk/raw/main/assets/demo.mp4)
 
 ## Features
 
