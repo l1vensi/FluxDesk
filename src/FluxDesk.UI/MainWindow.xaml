@@ -77,6 +77,13 @@
                                 </StackPanel>
                             </RadioButton>
 
+                            <RadioButton x:Name="NavQuickSwitcher" GroupName="MainNav" Style="{StaticResource NavRadioButtonStyle}" Click="Nav_Click" Tag="4">
+                                <StackPanel Orientation="Horizontal">
+                                    <Path x:Name="IcoNavQuickSwitcher" Data="{StaticResource IconQuickSwitcher}" Fill="{StaticResource TextSecondaryBrush}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0"/>
+                                    <TextBlock x:Name="TxtNavQuickSwitcher" Text="Quick Switcher" FontSize="13.5" FontWeight="Medium" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </RadioButton>
+
                             <RadioButton x:Name="NavHotkeys" GroupName="MainNav" Style="{StaticResource NavRadioButtonStyle}" Click="Nav_Click" Tag="1">
                                 <StackPanel Orientation="Horizontal">
                                     <Path x:Name="IcoNavHotkeys" Data="{StaticResource IconHotkeys}" Fill="{StaticResource TextSecondaryBrush}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0"/>
@@ -125,9 +132,6 @@
 
                             <!-- Normal Actions -->
                             <StackPanel x:Name="NormalDesktopActions" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                <Button x:Name="BtnConfigureQuickSwitcher" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,10,0" Click="BtnConfigureQuickSwitcher_Click">
-                                    <TextBlock x:Name="TxtBtnConfigureQs" Text="Quick Switcher" FontSize="13"/>
-                                </Button>
                                 <Button x:Name="BtnEnterSelectMode" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,10,0" Click="BtnEnterSelectMode_Click">
                                     <TextBlock x:Name="TxtBtnSelectMode" Text="Select" FontSize="13"/>
                                 </Button>
@@ -569,6 +573,86 @@
                             </StackPanel>
                         </ScrollViewer>
                     </Grid>
+
+                    <!-- Tab 4: Quick Switcher Layout View -->
+                    <Grid x:Name="ViewQuickSwitcher" Visibility="Collapsed" Margin="34,24,34,24">
+                        <Grid.RenderTransform>
+                            <TranslateTransform Y="0"/>
+                        </Grid.RenderTransform>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Header -->
+                        <Grid Grid.Row="0" Margin="0,0,0,16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock x:Name="TxtQsModalTitle" Text="Quick Switcher" FontSize="26" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                <TextBlock x:Name="TxtQsModalSub" Text="Click workspaces below to add or remove them, and drag cards on the monitor to reorder." FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,4,0,0"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Border Background="{StaticResource AccentTintBrush}" BorderBrush="{StaticResource AccentBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,7" Margin="0,0,10,0" VerticalAlignment="Center">
+                                    <TextBlock x:Name="TxtQsCounter" Text="Selected: 0 / 9" FontSize="12.5" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}"/>
+                                </Border>
+                                <Button x:Name="BtnQsModalReset" Style="{StaticResource SecondaryButtonStyle}" Padding="14,7" Click="BtnQsModalReset_Click">
+                                    <TextBlock x:Name="TxtQsModalReset" Text="Reset" FontSize="12.5"/>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Mini-Screen Visual Monitor Preview -->
+                        <StackPanel Grid.Row="1" Margin="0,0,0,16">
+                            <Border Background="#0A0E14" BorderBrush="#263142" BorderThickness="2" CornerRadius="10" Height="195" ClipToBounds="True">
+                                <Grid>
+                                    <Grid.Background>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                            <GradientStop Color="#0D1526" Offset="0"/>
+                                            <GradientStop Color="#14233C" Offset="0.5"/>
+                                            <GradientStop Color="#0B111C" Offset="1"/>
+                                        </LinearGradientBrush>
+                                    </Grid.Background>
+
+                                    <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12,10,0,0" Background="#7A0D1117" CornerRadius="5" Padding="8,3">
+                                        <TextBlock x:Name="TxtQsMiniScreenBadge" Text="LIVE MONITOR PREVIEW — DRAG CARDS TO REORDER" FontSize="10" FontWeight="Bold" Foreground="#9FB2C9"/>
+                                    </Border>
+
+                                    <Border HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="16,0,16,30"
+                                            Background="#E81C1D22" BorderBrush="#41444E" BorderThickness="1.2" CornerRadius="10" Padding="8">
+                                        <StackPanel x:Name="QsMiniScreenCardsPanel" Orientation="Horizontal" HorizontalAlignment="Center"/>
+                                    </Border>
+
+                                    <Border VerticalAlignment="Bottom" Height="22" Background="#D90F141D" BorderBrush="#222D3D" BorderThickness="0,1,0,0">
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <Border Width="10" Height="10" CornerRadius="2" Background="#38BDF8" Margin="3,0"/>
+                                            <Border Width="10" Height="10" CornerRadius="2" Background="#64748B" Margin="3,0"/>
+                                            <Border Width="10" Height="10" CornerRadius="2" Background="#64748B" Margin="3,0"/>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                            </Border>
+                            <Border Width="110" Height="5" Background="#253042" CornerRadius="0,0,4,4" HorizontalAlignment="Center"/>
+                            <Border Width="170" Height="3" Background="#1D2635" CornerRadius="2" HorizontalAlignment="Center" Margin="0,1,0,0"/>
+                        </StackPanel>
+
+                        <!-- Workspace Tile Grid -->
+                        <Grid Grid.Row="2">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock x:Name="TxtQsLimitNotice" Text="Maximum 9 workspaces can be added." FontSize="12" FontWeight="SemiBold" Foreground="#F87171" Margin="0,0,0,6" Visibility="Collapsed"/>
+                            <Border Grid.Row="1" Background="#11141B" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PreviewMouseWheel="ScrollViewer_PreviewMouseWheel">
+                                    <UniformGrid x:Name="QsConfigListPanel" Columns="3" VerticalAlignment="Top" Margin="0,0,8,0"/>
+                                </ScrollViewer>
+                            </Border>
+                        </Grid>
+                    </Grid>
                 </Grid>
             </Grid>
 
@@ -838,119 +922,6 @@
                             </Button>
                             <Button x:Name="BtnWeModalClose" Grid.Column="1" Height="34" Padding="20,0" Style="{StaticResource SecondaryButtonStyle}" Click="BtnWeModalClose_Click">
                                 <TextBlock x:Name="TxtWeModalClose" Text="Cancel" FontSize="12.5"/>
-                            </Button>
-                        </Grid>
-                    </Grid>
-                </Border>
-            </Grid>
-
-            <!-- Modal Overlay for Quick Switcher Visual Mini-Screen Configurator -->
-            <Grid x:Name="QsConfigModalOverlay" Grid.RowSpan="2" Background="#B8000000" Visibility="Collapsed" KeyboardNavigation.TabNavigation="Cycle">
-                <Border Background="{StaticResource CardBrush}"
-                        BorderBrush="{StaticResource BorderBrush}"
-                        BorderThickness="1"
-                        CornerRadius="12"
-                        Width="880"
-                        MaxWidth="940"
-                        MaxHeight="680"
-                        VerticalAlignment="Center"
-                        HorizontalAlignment="Center"
-                        Padding="22">
-                    <Border.Effect>
-                        <DropShadowEffect BlurRadius="28" Direction="270" Opacity="0.6" ShadowDepth="8" Color="#000000"/>
-                    </Border.Effect>
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-
-                        <!-- Header -->
-                        <Grid Grid.Row="0" Margin="0,0,0,14">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <StackPanel VerticalAlignment="Center">
-                                <TextBlock x:Name="TxtQsModalTitle" Text="Quick Switcher Layout" FontSize="17" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"/>
-                                <TextBlock x:Name="TxtQsModalSub" Text="Click workspaces below to add or remove them, and reorder directly on the preview." FontSize="12.5" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,3,0,0"/>
-                            </StackPanel>
-                            <Border Grid.Column="1" Background="{StaticResource AccentTintBrush}" BorderBrush="{StaticResource AccentBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,6" VerticalAlignment="Center">
-                                <TextBlock x:Name="TxtQsCounter" Text="Selected: 0 / 9" FontSize="12.5" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}"/>
-                            </Border>
-                        </Grid>
-
-                        <!-- Mini-Screen Visual Monitor Preview -->
-                        <StackPanel Grid.Row="1" Margin="0,0,0,14">
-                            <Border Background="#0A0E14" BorderBrush="#263142" BorderThickness="2" CornerRadius="10" Height="195" ClipToBounds="True">
-                                <Grid>
-                                    <!-- Simulated Wallpaper Background -->
-                                    <Grid.Background>
-                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                                            <GradientStop Color="#0D1526" Offset="0"/>
-                                            <GradientStop Color="#14233C" Offset="0.5"/>
-                                            <GradientStop Color="#0B111C" Offset="1"/>
-                                        </LinearGradientBrush>
-                                    </Grid.Background>
-
-                                    <!-- Top-left mini screen badge -->
-                                    <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12,10,0,0" Background="#7A0D1117" CornerRadius="5" Padding="8,3">
-                                        <TextBlock x:Name="TxtQsMiniScreenBadge" Text="LIVE MONITOR PREVIEW" FontSize="10" FontWeight="Bold" Foreground="#9FB2C9"/>
-                                    </Border>
-
-                                    <!-- Simulated Alt+W Switcher Bar -->
-                                    <Border HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="16,0,16,30"
-                                            Background="#E81C1D22" BorderBrush="#41444E" BorderThickness="1.2" CornerRadius="10" Padding="8">
-                                        <StackPanel x:Name="QsMiniScreenCardsPanel" Orientation="Horizontal" HorizontalAlignment="Center"/>
-                                    </Border>
-
-                                    <!-- Simulated Windows Taskbar at bottom -->
-                                    <Border VerticalAlignment="Bottom" Height="22" Background="#D90F141D" BorderBrush="#222D3D" BorderThickness="0,1,0,0">
-                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                            <Border Width="10" Height="10" CornerRadius="2" Background="#38BDF8" Margin="3,0"/>
-                                            <Border Width="10" Height="10" CornerRadius="2" Background="#64748B" Margin="3,0"/>
-                                            <Border Width="10" Height="10" CornerRadius="2" Background="#64748B" Margin="3,0"/>
-                                        </StackPanel>
-                                    </Border>
-                                </Grid>
-                            </Border>
-                            <!-- Monitor stand visual accent -->
-                            <Border Width="110" Height="5" Background="#253042" CornerRadius="0,0,4,4" HorizontalAlignment="Center"/>
-                            <Border Width="170" Height="3" Background="#1D2635" CornerRadius="2" HorizontalAlignment="Center" Margin="0,1,0,0"/>
-                        </StackPanel>
-
-                        <!-- Workspace Tile Grid -->
-                        <Grid Grid.Row="2">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                            </Grid.RowDefinitions>
-                            <TextBlock x:Name="TxtQsLimitNotice" Text="Maximum 9 workspaces can be added." FontSize="12" FontWeight="SemiBold" Foreground="#F87171" Margin="0,0,0,6" Visibility="Collapsed"/>
-                            <Border Grid.Row="1" Background="#11141B" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10" MinHeight="170" MaxHeight="250">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PreviewMouseWheel="ScrollViewer_PreviewMouseWheel">
-                                    <UniformGrid x:Name="QsConfigListPanel" Columns="3" VerticalAlignment="Top" Margin="0,0,8,0"/>
-                                </ScrollViewer>
-                            </Border>
-                        </Grid>
-
-                        <!-- Footer -->
-                        <Grid Grid.Row="3" Margin="0,14,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <Button x:Name="BtnQsModalReset" Height="34" Padding="16,0" Style="{StaticResource SecondaryButtonStyle}" Click="BtnQsModalReset_Click">
-                                <TextBlock x:Name="TxtQsModalReset" Text="Reset" FontSize="12.5"/>
-                            </Button>
-                            <Button x:Name="BtnQsModalCancel" Grid.Column="2" Height="34" Padding="18,0" Margin="0,0,10,0" Style="{StaticResource SecondaryButtonStyle}" Click="BtnQsModalCancel_Click">
-                                <TextBlock x:Name="TxtQsModalCancel" Text="Cancel" FontSize="12.5"/>
-                            </Button>
-                            <Button x:Name="BtnQsModalSave" Grid.Column="3" Height="34" Padding="20,0" Style="{StaticResource AccentButtonStyle}" Click="BtnQsModalSave_Click">
-                                <TextBlock x:Name="TxtQsModalSave" Text="Save" FontSize="12.5" FontWeight="Bold" Foreground="#0D1117"/>
                             </Button>
                         </Grid>
                     </Grid>

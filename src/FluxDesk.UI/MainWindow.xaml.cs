@@ -1009,8 +1009,7 @@ namespace DeskSpace
                    DeleteModalOverlay.Visibility == Visibility.Visible ||
                    ConflictModalOverlay.Visibility == Visibility.Visible ||
                    UninstallModalOverlay.Visibility == Visibility.Visible ||
-                   (WeModalOverlay != null && WeModalOverlay.Visibility == Visibility.Visible) ||
-                   (QsConfigModalOverlay != null && QsConfigModalOverlay.Visibility == Visibility.Visible);
+                   (WeModalOverlay != null && WeModalOverlay.Visibility == Visibility.Visible);
         }
 
         private void SetModalState(Grid overlay, bool open, Control? focusTarget = null)
@@ -1804,19 +1803,11 @@ namespace DeskSpace
             var oldView = _activeView;
             _activeView = targetView;
 
-            if (oldView != null && oldView != targetView && oldView.Visibility == Visibility.Visible)
+            if (oldView != null && oldView != targetView)
             {
+                oldView.BeginAnimation(OpacityProperty, null);
                 oldView.IsHitTestVisible = false;
-                var fadeOut = new DoubleAnimation(oldView.Opacity, 0.0, TimeSpan.FromMilliseconds(130))
-                {
-                    EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseIn }
-                };
-                var viewToHide = oldView;
-                fadeOut.Completed += (s, e) =>
-                {
-                    if (_activeView != viewToHide) viewToHide.Visibility = Visibility.Collapsed;
-                };
-                oldView.BeginAnimation(OpacityProperty, fadeOut);
+                oldView.Visibility = Visibility.Collapsed;
             }
 
             targetView.Visibility = Visibility.Visible;
@@ -1829,11 +1820,11 @@ namespace DeskSpace
                 targetView.RenderTransform = translate;
             }
 
-            var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(220))
+            var fadeIn = new DoubleAnimation(0.25, 1.0, TimeSpan.FromMilliseconds(130))
             {
                 EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
             };
-            var slideIn = new DoubleAnimation(14.0, 0.0, TimeSpan.FromMilliseconds(220))
+            var slideIn = new DoubleAnimation(8.0, 0.0, TimeSpan.FromMilliseconds(130))
             {
                 EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
             };
@@ -1851,6 +1842,9 @@ namespace DeskSpace
             IcoNavDesktops.Fill = (activeTab == 0) ? accent : secondary;
             TxtNavDesktops.Foreground = (activeTab == 0) ? primary : secondary;
 
+            IcoNavQuickSwitcher.Fill = (activeTab == 4) ? accent : secondary;
+            TxtNavQuickSwitcher.Foreground = (activeTab == 4) ? primary : secondary;
+
             IcoNavHotkeys.Fill = (activeTab == 1) ? accent : secondary;
             TxtNavHotkeys.Foreground = (activeTab == 1) ? primary : secondary;
 
@@ -1867,12 +1861,14 @@ namespace DeskSpace
             {
                 int tabIndex = int.Parse(rb.Tag.ToString()!);
                 UpdateSidebarHighlight(tabIndex);
+                if (tabIndex == 4) OpenQuickSwitcherTab();
                 Grid? target = tabIndex switch
                 {
                     0 => ViewDesktops,
                     1 => ViewHotkeys,
                     2 => ViewSettings,
                     3 => ViewAbout,
+                    4 => ViewQuickSwitcher,
                     _ => null
                 };
                 if (target != null) SwitchViewWithAnimation(target);
@@ -1902,6 +1898,8 @@ namespace DeskSpace
             bool isRu = (lang == "ru");
 
             TxtNavDesktops.Text = isRu ? "Рабочие столы" : "Desktops";
+            if (TxtNavQuickSwitcher != null)
+                TxtNavQuickSwitcher.Text = isRu ? "Быстрое меню" : "Quick Switcher";
             TxtNavHotkeys.Text = isRu ? "Горячие клавиши" : "Hotkeys";
             TxtNavSettings.Text = isRu ? "Настройки" : "Settings";
             TxtNavAbout.Text = isRu ? "О программе" : "About";
@@ -1971,10 +1969,10 @@ namespace DeskSpace
             TxtSecKeyboard.Text = isRu ? "Сочетания клавиш" : "Keyboard Shortcuts";
             TxtQuickSwitcherTitle.Text = isRu ? "Быстрое переключение (Quick Switcher)" : "Quick Switcher";
             TxtQuickSwitcherDesc.Text = isRu ? "Включить всплывающее меню для быстрого переключения столов" : "Enable the quick switcher overlay for fast desktop switching";
-            if (TxtBtnConfigureQs != null)
-                TxtBtnConfigureQs.Text = isRu ? "Быстрое меню" : "Quick Switcher";
             if (TxtBtnConfigureQsSettings != null)
                 TxtBtnConfigureQsSettings.Text = isRu ? "Настроить..." : "Customize...";
+            if (ViewQuickSwitcher != null && ViewQuickSwitcher.Visibility == Visibility.Visible)
+                OpenQuickSwitcherTab();
             TxtQsForwardTitle.Text = isRu ? "Быстрое переключение (Вперед)" : "Quick Switcher (Forward)";
             TxtQsForwardDesc.Text = isRu ? "Перейти к следующему рабочему столу" : "Cycle to next desktop";
             TxtQsBackwardTitle.Text = isRu ? "Быстрое переключение (Назад)" : "Quick Switcher (Backward)";
@@ -2133,16 +2131,6 @@ namespace DeskSpace
                 if (e.Key == Key.Escape)
                 {
                     CloseUninstallModal();
-                    e.Handled = true;
-                }
-                return;
-            }
-
-            if (QsConfigModalOverlay != null && QsConfigModalOverlay.Visibility == Visibility.Visible)
-            {
-                if (e.Key == Key.Escape)
-                {
-                    CloseQsConfigModal();
                     e.Handled = true;
                 }
                 return;
@@ -4156,47 +4144,52 @@ namespace DeskSpace
         #region Quick Switcher (Alt + W) Visual Mini-Screen Editor
 
         private List<string> _editingQsIds = new List<string>();
+        private Point _qsDragStartPoint;
+        private string? _qsDraggingId;
 
         private void BtnConfigureQuickSwitcher_Click(object sender, RoutedEventArgs e)
+        {
+            if (NavQuickSwitcher != null)
+            {
+                NavQuickSwitcher.IsChecked = true;
+                Nav_Click(NavQuickSwitcher, new RoutedEventArgs());
+            }
+        }
+
+        private void OpenQuickSwitcherTab()
         {
             _editingQsIds = _config.GetQuickSwitcherDesktops().Select(d => d.Id).ToList();
             bool isRu = _config.Language == "ru";
 
-            TxtQsModalTitle.Text = isRu ? "Настройка быстрого меню" : "Quick Switcher Layout";
+            TxtQsModalTitle.Text = isRu ? "Быстрое меню" : "Quick Switcher";
             TxtQsModalSub.Text = isRu
-                ? "Нажмите на нужные столы снизу, чтобы добавить или убрать их. Порядок меняется прямо на мини-экране."
-                : "Click workspaces below to add or remove them, and reorder directly on the preview.";
-            TxtQsMiniScreenBadge.Text = isRu ? "ЖИВОЙ ПРЕДПРОСМОТР ЭКРАНА" : "LIVE MONITOR PREVIEW";
+                ? "Нажмите на столы ниже, чтобы добавить или убрать их. Перетаскивайте карточки на экране для смены порядка."
+                : "Click workspaces below to add or remove them. Drag cards on the preview monitor to reorder.";
+            TxtQsMiniScreenBadge.Text = isRu
+                ? "ЖИВОЙ ПРЕДПРОСМОТР — ПЕРЕТАСКИВАЙТЕ КАРТОЧКИ МЫШКОЙ"
+                : "LIVE MONITOR PREVIEW — DRAG CARDS TO REORDER";
             TxtQsLimitNotice.Text = isRu
                 ? "Достигнут лимит: максимум 9 рабочих столов."
                 : "Limit reached: maximum 9 workspaces.";
             TxtQsLimitNotice.Visibility = Visibility.Collapsed;
-
             TxtQsModalReset.Text = isRu ? "По умолчанию" : "Reset";
-            TxtQsModalCancel.Text = isRu ? "Отмена" : "Cancel";
-            TxtQsModalSave.Text = isRu ? "Сохранить" : "Save";
 
             RefreshQsConfigView();
-            SetModalState(QsConfigModalOverlay, true, BtnQsModalSave);
         }
 
-        private void CloseQsConfigModal() => SetModalState(QsConfigModalOverlay, false);
-
-        private void BtnQsModalCancel_Click(object sender, RoutedEventArgs e) => CloseQsConfigModal();
+        private void SaveQsSelection()
+        {
+            _config.QuickSwitcherCustomSelection = true;
+            _config.QuickSwitcherDesktopIds = _editingQsIds.Take(9).ToList();
+            _config.Save();
+        }
 
         private void BtnQsModalReset_Click(object sender, RoutedEventArgs e)
         {
             _editingQsIds = _config.Desktops.Take(9).Select(d => d.Id).ToList();
             TxtQsLimitNotice.Visibility = Visibility.Collapsed;
+            SaveQsSelection();
             RefreshQsConfigView();
-        }
-
-        private void BtnQsModalSave_Click(object sender, RoutedEventArgs e)
-        {
-            _config.QuickSwitcherCustomSelection = true;
-            _config.QuickSwitcherDesktopIds = _editingQsIds.Take(9).ToList();
-            _config.Save();
-            CloseQsConfigModal();
         }
 
         private void RefreshQsConfigView()
@@ -4212,7 +4205,7 @@ namespace DeskSpace
                 ? $"Выбрано: {_editingQsIds.Count} / 9"
                 : $"Selected: {_editingQsIds.Count} / 9";
 
-            // 1. Render Interactive Live Mini-Screen Cards (reorder/remove on hover)
+            // 1. Render Draggable Live Mini-Screen Cards
             QsMiniScreenCardsPanel.Children.Clear();
             var accentBrush = (Brush)FindResource("AccentBrush");
             var textPrimary = (Brush)FindResource("TextPrimaryBrush");
@@ -4242,6 +4235,7 @@ namespace DeskSpace
                     string id = _editingQsIds[i];
                     var d = _config.Desktops.First(x => x.Id == id);
                     bool isActive = (d.Id == activeId);
+                    var defaultBorderBrush = isActive ? accentBrush : new SolidColorBrush(Color.FromRgb(65, 68, 78));
 
                     var miniCard = new Border
                     {
@@ -4250,9 +4244,11 @@ namespace DeskSpace
                         Margin = new Thickness(i == 0 ? 0 : 6, 0, 0, 0),
                         CornerRadius = new CornerRadius(5),
                         Background = new SolidColorBrush(Color.FromRgb(34, 36, 42)),
-                        BorderBrush = isActive ? accentBrush : new SolidColorBrush(Color.FromRgb(65, 68, 78)),
+                        BorderBrush = defaultBorderBrush,
                         BorderThickness = new Thickness(isActive ? 1.8 : 1),
-                        ClipToBounds = true
+                        ClipToBounds = true,
+                        Cursor = Cursors.SizeAll,
+                        AllowDrop = true
                     };
 
                     var cardGrid = new Grid();
@@ -4296,79 +4292,102 @@ namespace DeskSpace
                     };
                     cardGrid.Children.Add(labelBar);
 
-                    // Top hover overlay controls: < | > | x
-                    var hoverBar = new Border
+                    // Compact remove button in top-right on hover
+                    var btnRemove = new Button
                     {
-                        VerticalAlignment = VerticalAlignment.Top,
-                        Background = new SolidColorBrush(Color.FromArgb(210, 12, 16, 24)),
-                        Padding = new Thickness(2),
-                        Visibility = Visibility.Collapsed
-                    };
-                    var hoverPanel = new Grid();
-                    hoverPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                    hoverPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                    hoverPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                    hoverPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-                    Button MakeMiniActionBtn(string label, bool enabled, Color fgColor) => new Button
-                    {
-                        Content = label,
-                        Width = 18,
-                        Height = 16,
+                        Content = "x",
+                        Width = 17,
+                        Height = 17,
                         Padding = new Thickness(0),
                         FontSize = 9.5,
                         FontWeight = FontWeights.Bold,
-                        Foreground = new SolidColorBrush(fgColor),
-                        Background = new SolidColorBrush(Color.FromRgb(28, 36, 50)),
+                        Foreground = new SolidColorBrush(Color.FromRgb(248, 113, 113)),
+                        Background = new SolidColorBrush(Color.FromArgb(220, 15, 20, 30)),
                         BorderThickness = new Thickness(0),
+                        HorizontalAlignment = HorizontalAlignment.Right,
+                        VerticalAlignment = VerticalAlignment.Top,
+                        Margin = new Thickness(0, 3, 3, 0),
                         Cursor = Cursors.Hand,
-                        IsEnabled = enabled,
-                        Opacity = enabled ? 1.0 : 0.3
+                        Visibility = Visibility.Collapsed
                     };
-
-                    var btnLeft = MakeMiniActionBtn("<", i > 0, Color.FromRgb(190, 230, 253));
-                    btnLeft.Margin = new Thickness(0, 0, 2, 0);
                     string capId = d.Id;
-                    btnLeft.Click += (s, ev) =>
-                    {
-                        int idx = _editingQsIds.IndexOf(capId);
-                        if (idx > 0)
-                        {
-                            (_editingQsIds[idx - 1], _editingQsIds[idx]) = (_editingQsIds[idx], _editingQsIds[idx - 1]);
-                            RefreshQsConfigView();
-                        }
-                    };
-                    Grid.SetColumn(btnLeft, 0);
-                    hoverPanel.Children.Add(btnLeft);
-
-                    var btnRight = MakeMiniActionBtn(">", i < count - 1, Color.FromRgb(190, 230, 253));
-                    btnRight.Click += (s, ev) =>
-                    {
-                        int idx = _editingQsIds.IndexOf(capId);
-                        if (idx >= 0 && idx < _editingQsIds.Count - 1)
-                        {
-                            (_editingQsIds[idx], _editingQsIds[idx + 1]) = (_editingQsIds[idx + 1], _editingQsIds[idx]);
-                            RefreshQsConfigView();
-                        }
-                    };
-                    Grid.SetColumn(btnRight, 1);
-                    hoverPanel.Children.Add(btnRight);
-
-                    var btnRemove = MakeMiniActionBtn("x", true, Color.FromRgb(248, 113, 113));
                     btnRemove.Click += (s, ev) =>
                     {
+                        ev.Handled = true;
                         _editingQsIds.Remove(capId);
                         TxtQsLimitNotice.Visibility = Visibility.Collapsed;
+                        SaveQsSelection();
                         RefreshQsConfigView();
                     };
-                    Grid.SetColumn(btnRemove, 3);
-                    hoverPanel.Children.Add(btnRemove);
+                    cardGrid.Children.Add(btnRemove);
 
-                    hoverBar.Child = hoverPanel;
-                    cardGrid.Children.Add(hoverBar);
+                    miniCard.MouseEnter += (s, ev) => btnRemove.Visibility = Visibility.Visible;
+                    miniCard.MouseLeave += (s, ev) => btnRemove.Visibility = Visibility.Collapsed;
 
-                    miniCard.MouseEnter += (s, ev) => hoverBar.Visibility = Visibility.Visible;
-                    miniCard.MouseLeave += (s, ev) => hoverBar.Visibility = Visibility.Collapsed;
+                    // Drag & Drop handlers for reordering cards directly with mouse
+                    miniCard.PreviewMouseLeftButtonDown += (s, ev) =>
+                    {
+                        if (ev.OriginalSource is DependencyObject dep)
+                        {
+                            var cur = dep;
+                            while (cur != null && cur != miniCard)
+                            {
+                                if (cur == btnRemove) return;
+                                cur = VisualTreeHelper.GetParent(cur);
+                            }
+                        }
+                        _qsDragStartPoint = ev.GetPosition(null);
+                        _qsDraggingId = capId;
+                    };
+
+                    miniCard.MouseMove += (s, ev) =>
+                    {
+                        if (ev.LeftButton == MouseButtonState.Pressed && !string.IsNullOrEmpty(_qsDraggingId))
+                        {
+                            Vector diff = _qsDragStartPoint - ev.GetPosition(null);
+                            if (Math.Abs(diff.X) > SystemParameters.MinimumHorizontalDragDistance ||
+                                Math.Abs(diff.Y) > SystemParameters.MinimumVerticalDragDistance)
+                            {
+                                string dragId = _qsDraggingId;
+                                _qsDraggingId = null;
+                                DragDrop.DoDragDrop(miniCard, dragId, DragDropEffects.Move);
+                            }
+                        }
+                    };
+
+                    miniCard.DragOver += (s, ev) =>
+                    {
+                        if (ev.Data.GetDataPresent(typeof(string)))
+                        {
+                            ev.Effects = DragDropEffects.Move;
+                            miniCard.BorderBrush = accentBrush;
+                            ev.Handled = true;
+                        }
+                    };
+
+                    miniCard.DragLeave += (s, ev) =>
+                    {
+                        miniCard.BorderBrush = defaultBorderBrush;
+                    };
+
+                    miniCard.Drop += (s, ev) =>
+                    {
+                        miniCard.BorderBrush = defaultBorderBrush;
+                        if (ev.Data.GetDataPresent(typeof(string)))
+                        {
+                            string sourceId = (string)ev.Data.GetData(typeof(string))!;
+                            int fromIdx = _editingQsIds.IndexOf(sourceId);
+                            int toIdx = _editingQsIds.IndexOf(capId);
+                            if (fromIdx >= 0 && toIdx >= 0 && fromIdx != toIdx)
+                            {
+                                _editingQsIds.RemoveAt(fromIdx);
+                                _editingQsIds.Insert(toIdx, sourceId);
+                                SaveQsSelection();
+                                RefreshQsConfigView();
+                            }
+                            ev.Handled = true;
+                        }
+                    };
 
                     miniCard.Child = cardGrid;
                     QsMiniScreenCardsPanel.Children.Add(miniCard);
@@ -4405,7 +4424,6 @@ namespace DeskSpace
                 tileGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 tileGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-                // Thumbnail preview image
                 var thumbBox = new Border
                 {
                     Width = 60,
@@ -4424,7 +4442,6 @@ namespace DeskSpace
                 Grid.SetColumn(thumbBox, 0);
                 tileGrid.Children.Add(thumbBox);
 
-                // Name & status
                 var infoStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(4, 0, 6, 0) };
                 infoStack.Children.Add(new TextBlock
                 {
@@ -4445,7 +4462,6 @@ namespace DeskSpace
                 Grid.SetColumn(infoStack, 1);
                 tileGrid.Children.Add(infoStack);
 
-                // Slot badge / checkmark
                 var slotBadge = new Border
                 {
                     Width = 24,
@@ -4497,6 +4513,7 @@ namespace DeskSpace
                         _editingQsIds.Add(deskId);
                         TxtQsLimitNotice.Visibility = Visibility.Collapsed;
                     }
+                    SaveQsSelection();
                     RefreshQsConfigView();
                 };
 
