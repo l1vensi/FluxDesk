@@ -937,15 +937,17 @@ namespace WorkSpace
                     : null;
                 Func<bool> isCancelled = () => IsDisposed || Volatile.Read(ref _switchGeneration) != myGen;
 
+                bool isStartupCopy = isStartup;
                 Task.Run(() =>
                 {
                     try
                     {
+                        int waitTimeout = isStartupCopy ? 4000 : 2000;
                         bool transitioned = IconLayoutManager.WaitForDesktopChange(
-                            oldItemCount, prevPath, targetPath, timeoutMs: 1500, isCancelled: isCancelled);
+                            oldItemCount, prevPath, targetPath, timeoutMs: waitTimeout, isCancelled: isCancelled);
                         if (isCancelled()) return;
 
-                        IconLayoutManager.RestoreLayout(targetId, isCancelled: isCancelled, allowDirtySave: transitioned);
+                        IconLayoutManager.RestoreLayout(targetId, isCancelled: isCancelled, allowDirtySave: false);
                         if (isCancelled()) return;
 
                         if (transitioned && _switcher.IsHandleCreated)
@@ -960,11 +962,20 @@ namespace WorkSpace
                             }));
                         }
 
-                        Thread.Sleep(150);
+                        Thread.Sleep(200);
                         if (isCancelled()) return;
 
-                        IconLayoutManager.RestoreLayout(targetId, isCancelled: isCancelled, allowDirtySave: transitioned);
+                        IconLayoutManager.RestoreLayout(targetId, isCancelled: isCancelled, allowDirtySave: false);
                         if (isCancelled()) return;
+
+                        if (isStartupCopy)
+                        {
+                            // On Windows startup, Explorer / OneDrive can re-layout icons 1-2s after logon
+                            Thread.Sleep(1200);
+                            if (isCancelled()) return;
+                            IconLayoutManager.RestoreLayout(targetId, isCancelled: isCancelled, allowDirtySave: false);
+                            if (isCancelled()) return;
+                        }
 
                         var freshIcons = IconLayoutManager.GetCurrentIcons();
                         DesktopPreviewGenerator.QueueRender(targetSnapshot, indWp, defWp, freshIcons, showIcons);

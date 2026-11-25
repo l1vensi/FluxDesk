@@ -437,8 +437,12 @@ namespace WorkSpace
                 return isCancelled?.Invoke() != true;
             }
 
-            bool phase1Passed = false;
-            while (sw.ElapsedMilliseconds < timeoutMs)
+            bool sameFolder = !string.IsNullOrWhiteSpace(prevPath) &&
+                              string.Equals(prevPath.TrimEnd('\\', '/'), targetPath.TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase);
+
+            bool phase1Passed = sameFolder;
+            bool expectBigDrop = !sameFolder && (oldItemCount > 6 && expectedFileCount <= 4);
+            while (!phase1Passed && sw.ElapsedMilliseconds < timeoutMs)
             {
                 if (isCancelled?.Invoke() == true) return false;
 
@@ -449,30 +453,37 @@ namespace WorkSpace
                 }
                 int count = (int)cPtr;
 
-                if (count != oldItemCount)
+                if (count != oldItemCount && (!expectBigDrop || count <= expectedFileCount + 6))
                 {
                     phase1Passed = true;
                     Log($"Phase 1 passed: count changed {oldItemCount} -> {count} at {sw.ElapsedMilliseconds}ms");
                     break;
                 }
 
-                var cur = GetCurrentIcons();
-                bool foundExclusive = false;
-                foreach (var c in cur)
+                if (exclusiveTargetNames.Count > 0)
                 {
-                    if (exclusiveTargetNames.Count > 0
-                        ? exclusiveTargetNames.Contains(c.Name)
-                        : targetNames.Contains(c.Name))
+                    var cur = GetCurrentIcons();
+                    bool foundExclusive = false;
+                    foreach (var c in cur)
                     {
-                        foundExclusive = true;
+                        if (exclusiveTargetNames.Contains(c.Name))
+                        {
+                            foundExclusive = true;
+                            break;
+                        }
+                    }
+
+                    if (foundExclusive)
+                    {
+                        phase1Passed = true;
+                        Log($"Phase 1 passed: exclusive item matched at {sw.ElapsedMilliseconds}ms");
                         break;
                     }
                 }
-
-                if (foundExclusive || (expectedFileCount == 0 && cur.Count <= 2))
+                else if (expectedFileCount == 0 && count <= 3)
                 {
                     phase1Passed = true;
-                    Log($"Phase 1 passed: items matched at {sw.ElapsedMilliseconds}ms");
+                    Log($"Phase 1 passed: empty target count={count} at {sw.ElapsedMilliseconds}ms");
                     break;
                 }
 
@@ -498,7 +509,8 @@ namespace WorkSpace
                     continue;
                 }
                 int count = (int)cPtr;
-                bool validCount = (count > 0) || (expectedFileCount == 0 && count == 0);
+                bool staleOldCount = !sameFolder && (oldItemCount > 6 && count == oldItemCount && Math.Abs(oldItemCount - expectedFileCount) > 6);
+                bool validCount = !staleOldCount && ((count > 0) || (expectedFileCount == 0 && count == 0));
 
                 if (validCount && count == lastCount)
                 {
@@ -517,7 +529,7 @@ namespace WorkSpace
                 Thread.Sleep(45);
             }
 
-            return isCancelled?.Invoke() != true;
+            return isCancelled?.Invoke() != true && !(!sameFolder && oldItemCount > 6 && lastCount == oldItemCount && Math.Abs(oldItemCount - expectedFileCount) > 6);
         }
 
         public static void RestoreLayout(string layoutKey, Func<bool>? isCancelled = null, bool allowDirtySave = true)
@@ -674,15 +686,6 @@ namespace WorkSpace
                     }
 
                     Log($"RestoreLayout({layoutKey}): repositioned {repositioned}/{currentIcons.Count}");
-
-                    // Merge newly allocated items into existing saved layout instead of discarding temporarily missing icons
-                    if (allowDirtySave && newlyAllocated.Count > 0 && isCancelled?.Invoke() != true)
-                    {
-                        var merged = new List<IconPosition>(existingSavedList.Count + newlyAllocated.Count);
-                        merged.AddRange(existingSavedList);
-                        merged.AddRange(newlyAllocated);
-                        SaveLayoutFromList(layoutKey, merged);
-                    }
                 }
                 catch (Exception ex)
                 {
