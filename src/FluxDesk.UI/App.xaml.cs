@@ -25,12 +25,16 @@ public partial class App : Application
     [DllImport("user32.dll")]
     private static extern bool PostMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
 
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    private static extern int SetCurrentProcessExplicitAppUserModelID(string AppID);
+
     private const int SW_SHOW = 5;
     private const int SW_RESTORE = 9;
     internal const uint WM_FLUXDESK_OPEN_UNINSTALL = 0x8001; // WM_APP + 1
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        try { SetCurrentProcessExplicitAppUserModelID("FluxDesk.WorkspaceManager"); } catch { }
         DispatcherUnhandledException += OnDispatcherUnhandledException;
 
         _singleInstanceMutex = new Mutex(false, @"Local\FluxDesk_UI_SingleInstance");

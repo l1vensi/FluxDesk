@@ -532,7 +532,7 @@
                                             <Image Source="logo.png" Width="44" Height="44" Margin="0,0,16,0" RenderOptions.BitmapScalingMode="HighQuality"/>
                                             <StackPanel VerticalAlignment="Center">
                                                 <TextBlock Text="FluxDesk" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"/>
-                                                <TextBlock x:Name="TxtAboutVersion" Text="Version 2.1.1 Beta (x64)" FontSize="13" Foreground="{StaticResource AccentBrush}"/>
+                                                <TextBlock x:Name="TxtAboutVersion" Text="Version 2.1.2 Beta (x64)" FontSize="13" Foreground="{StaticResource AccentBrush}"/>
                                             </StackPanel>
                                         </StackPanel>
                                         <TextBlock x:Name="TxtAboutDesc" Text="Independent, free &amp; private desktop workspace manager for Windows 10 &amp; 11." FontSize="13.5" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,0,16"/>
@@ -607,7 +607,7 @@
 
                         <!-- Mini-Screen Visual Monitor Preview -->
                         <StackPanel Grid.Row="1" Margin="0,0,0,16">
-                            <Border BorderBrush="#263142" BorderThickness="2" CornerRadius="10" Height="195">
+                            <Border BorderBrush="#263142" BorderThickness="2" CornerRadius="10" Height="195" ClipToBounds="True">
                                 <Border.Background>
                                     <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
                                         <GradientStop Color="#0D1526" Offset="0"/>

@@ -1993,7 +1993,7 @@ namespace DeskSpace
             TxtBtnUninstall.Text = isRu ? "Удалить..." : "Uninstall...";
 
             TxtTitleAbout.Text = isRu ? "О программе FluxDesk" : "About FluxDesk";
-            TxtAboutVersion.Text = isRu ? "Версия 2.1.1 Бета (x64)" : "Version 2.1.1 Beta (x64)";
+            TxtAboutVersion.Text = isRu ? "Версия 2.1.2 Бета (x64)" : "Version 2.1.2 Beta (x64)";
             TxtAboutDesc.Text = isRu ? "Независимый, бесплатный и локальный менеджер рабочих столов для Windows 10 и 11." : "Independent, free & private desktop workspace manager for Windows 10 & 11.";
             TxtAboutF1.Text = isRu ? "• Полностью бесплатно: без подписок, рекламы и ограничений по числу столов." : "• Free & Open Source: No paywalls, no ads, unlimited workspaces.";
             TxtAboutF2.Text = isRu ? "• 100% локально и конфиденциально: без серверов и телеметрии." : "• 100% Private & Local: No servers, no tracking, zero telemetry.";
@@ -2780,8 +2780,47 @@ namespace DeskSpace
                 var shortcut = shell.CreateShortcut(shortcutPath);
                 shortcut.TargetPath = exePath;
                 shortcut.WorkingDirectory = System.IO.Path.GetDirectoryName(exePath) ?? "";
+                shortcut.IconLocation = $"{exePath},0";
                 shortcut.Description = "FluxDesk - Desktop Workspace Manager";
                 shortcut.Save();
+
+                EnsureTaskbarShortcutIcon(shell, exePath);
+            }
+            catch { }
+        }
+
+        private void EnsureTaskbarShortcutIcon(dynamic shell, string exePath)
+        {
+            try
+            {
+                string taskbarFolder = System.IO.Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    @"Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar");
+                string pinnedPath = System.IO.Path.Combine(taskbarFolder, "FluxDesk.lnk");
+                if (!File.Exists(pinnedPath)) return;
+
+                var pinned = shell.CreateShortcut(pinnedPath);
+                string target = pinned.TargetPath as string ?? "";
+                string iconLoc = pinned.IconLocation as string ?? "";
+                bool needsSave = false;
+
+                if (string.IsNullOrWhiteSpace(iconLoc) || iconLoc.StartsWith(",", StringComparison.Ordinal))
+                {
+                    pinned.IconLocation = $"{exePath},0";
+                    needsSave = true;
+                }
+
+                if (!string.IsNullOrWhiteSpace(target) &&
+                    target.IndexOf("OneDrive", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                    exePath.IndexOf("OneDrive", StringComparison.OrdinalIgnoreCase) < 0)
+                {
+                    pinned.TargetPath = exePath;
+                    pinned.WorkingDirectory = System.IO.Path.GetDirectoryName(exePath) ?? "";
+                    pinned.IconLocation = $"{exePath},0";
+                    needsSave = true;
+                }
+
+                if (needsSave) pinned.Save();
             }
             catch { }
         }
@@ -4418,10 +4457,16 @@ namespace DeskSpace
 
                     double curX = ev.GetPosition(QsMiniScreenCardsPanel).X;
                     double dx = curX - _qsDragStartX;
-                    translateTransform.X = dx;
 
                     int curIdx = _editingQsIds.IndexOf(_qsDraggingId);
                     if (curIdx < 0) return;
+
+                    if (curIdx == 0 && dx < 0)
+                        dx = Math.Max(dx, -6);
+                    else if (curIdx == _editingQsIds.Count - 1 && dx > 0)
+                        dx = Math.Min(dx, 6);
+
+                    translateTransform.X = dx;
 
                     if (dx > step * 0.55 && curIdx < _editingQsIds.Count - 1)
                     {
