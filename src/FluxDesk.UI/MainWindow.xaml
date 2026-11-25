@@ -73,7 +73,7 @@
                             <RadioButton x:Name="NavDesktops" GroupName="MainNav" Style="{StaticResource NavRadioButtonStyle}" IsChecked="True" Click="Nav_Click" Tag="0">
                                 <StackPanel Orientation="Horizontal">
                                     <Path x:Name="IcoNavDesktops" Data="{StaticResource IconDesktops}" Fill="{StaticResource AccentBrush}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0"/>
-                                    <TextBlock x:Name="TxtNavDesktops" Text="Desktops" FontSize="13.5" FontWeight="Medium" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="TxtNavDesktops" Text="Workspaces" FontSize="13.5" FontWeight="Medium" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </RadioButton>
 
@@ -90,31 +90,42 @@
                                     <TextBlock x:Name="TxtNavHotkeys" Text="Hotkeys" FontSize="13.5" FontWeight="Medium" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </RadioButton>
-                        </StackPanel>
 
-                        <!-- Bottom Settings & About -->
-                        <StackPanel Grid.Row="2" Margin="12,0,12,18">
-                            <Border Height="1" Background="{StaticResource BorderBrush}" Margin="0,0,0,12"/>
-                            
                             <RadioButton x:Name="NavSettings" GroupName="MainNav" Style="{StaticResource NavRadioButtonStyle}" Click="Nav_Click" Tag="2">
                                 <StackPanel Orientation="Horizontal">
                                     <Path x:Name="IcoNavSettings" Data="{StaticResource IconSettings}" Fill="{StaticResource TextSecondaryBrush}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0"/>
                                     <TextBlock x:Name="TxtNavSettings" Text="Settings" FontSize="13.5" FontWeight="Medium" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </RadioButton>
+                        </StackPanel>
+
+                        <!-- Bottom Version / Info Pill -->
+                        <StackPanel Grid.Row="2" Margin="12,0,12,18">
+                            <Border Height="1" Background="{StaticResource BorderBrush}" Margin="0,0,0,12"/>
 
                             <RadioButton x:Name="NavAbout" GroupName="MainNav" Style="{StaticResource NavRadioButtonStyle}" Click="Nav_Click" Tag="3">
-                                <StackPanel Orientation="Horizontal">
-                                    <Path x:Name="IcoNavAbout" Data="{StaticResource IconAbout}" Fill="{StaticResource TextSecondaryBrush}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0"/>
-                                    <TextBlock x:Name="TxtNavAbout" Text="About" FontSize="13.5" FontWeight="Medium" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"/>
-                                </StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Path x:Name="IcoNavAbout" Grid.Column="0" Data="{StaticResource IconAbout}" Fill="{StaticResource TextSecondaryBrush}" Width="15" Height="15" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                    <TextBlock x:Name="TxtNavAbout" Grid.Column="1" Text="About" FontSize="13" FontWeight="Medium" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                                    <Border Grid.Column="2" Background="#1A2232" BorderBrush="#2A364B" BorderThickness="1" CornerRadius="5" Padding="6,2" VerticalAlignment="Center">
+                                        <TextBlock Text="v2.2.0" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}"/>
+                                    </Border>
+                                </Grid>
                             </RadioButton>
                         </StackPanel>
                     </Grid>
                 </Border>
 
                 <!-- Right Content Container -->
-                <Grid Grid.Column="1" Background="Transparent">
+                <Grid x:Name="RightContentGrid" Grid.Column="1" Background="Transparent" RenderTransformOrigin="0.5,0.5">
+                    <Grid.RenderTransform>
+                        <ScaleTransform x:Name="RightContentScale" ScaleX="1" ScaleY="1"/>
+                    </Grid.RenderTransform>
                     <!-- Tab 0: Desktops View -->
                     <Grid x:Name="ViewDesktops" Visibility="Visible" Margin="34,24,34,24">
                         <Grid.RenderTransform>
@@ -128,7 +139,7 @@
 
                         <!-- Header -->
                         <Grid Grid.Row="0" Margin="0,0,0,18">
-                            <TextBlock x:Name="TxtTitleDesktops" Text="Desktops" FontSize="26" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="TxtTitleDesktops" Text="Workspaces" FontSize="26" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
 
                             <!-- Normal Actions -->
                             <StackPanel x:Name="NormalDesktopActions" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
@@ -138,7 +149,7 @@
                                 <Button Style="{StaticResource AccentButtonStyle}" Click="BtnCreateDesktop_Click">
                                     <StackPanel Orientation="Horizontal">
                                         <Path Data="{StaticResource IconPlus}" Fill="#0D1117" Width="12" Height="12" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                        <TextBlock x:Name="TxtBtnCreateDesktop" Text="Create Desktop" FontSize="13" FontWeight="Bold" Foreground="#0D1117" VerticalAlignment="Center"/>
+                                        <TextBlock x:Name="TxtBtnCreateDesktop" Text="New Workspace" FontSize="13" FontWeight="Bold" Foreground="#0D1117" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </Button>
                             </StackPanel>
@@ -175,10 +186,10 @@
                         </Border>
 
                         <!-- Cards Scroll Area -->
-                        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" PreviewMouseWheel="ScrollViewer_PreviewMouseWheel" PreviewMouseLeftButtonDown="ScrollViewer_PreviewMouseLeftButtonDown" PreviewKeyDown="ScrollViewer_PreviewKeyDown" RequestBringIntoView="ScrollViewer_RequestBringIntoView">
-                            <StackPanel x:Name="DesktopCardsPanel" Margin="0,0,10,0">
+                        <ScrollViewer x:Name="DesktopCardsScroll" Grid.Row="2" VerticalScrollBarVisibility="Auto" SizeChanged="DesktopCardsScroll_SizeChanged" PreviewMouseWheel="ScrollViewer_PreviewMouseWheel" PreviewMouseLeftButtonDown="ScrollViewer_PreviewMouseLeftButtonDown" PreviewKeyDown="ScrollViewer_PreviewKeyDown" RequestBringIntoView="ScrollViewer_RequestBringIntoView">
+                            <UniformGrid x:Name="DesktopCardsPanel" Columns="2" VerticalAlignment="Top" Margin="0,0,2,0">
                                 <!-- Cards populated dynamically from C# -->
-                            </StackPanel>
+                            </UniformGrid>
                         </ScrollViewer>
                     </Grid>
 
@@ -532,7 +543,7 @@
                                             <Image Source="logo.png" Width="44" Height="44" Margin="0,0,16,0" RenderOptions.BitmapScalingMode="HighQuality"/>
                                             <StackPanel VerticalAlignment="Center">
                                                 <TextBlock Text="FluxDesk" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"/>
-                                                <TextBlock x:Name="TxtAboutVersion" Text="Version 2.1.2 Beta (x64)" FontSize="13" Foreground="{StaticResource AccentBrush}"/>
+                                                <TextBlock x:Name="TxtAboutVersion" Text="Version 2.2.0 Beta (x64)" FontSize="13" Foreground="{StaticResource AccentBrush}"/>
                                             </StackPanel>
                                         </StackPanel>
                                         <TextBlock x:Name="TxtAboutDesc" Text="Independent, free &amp; private desktop workspace manager for Windows 10 &amp; 11." FontSize="13.5" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,0,16"/>
@@ -575,7 +586,7 @@
                     </Grid>
 
                     <!-- Tab 4: Quick Switcher Layout View -->
-                    <Grid x:Name="ViewQuickSwitcher" Visibility="Collapsed" Margin="34,24,34,24">
+                    <Grid x:Name="ViewQuickSwitcher" Visibility="Collapsed" Margin="34,24,34,24" SizeChanged="ViewQuickSwitcher_SizeChanged">
                         <Grid.RenderTransform>
                             <TranslateTransform Y="0"/>
                         </Grid.RenderTransform>
@@ -607,7 +618,7 @@
 
                         <!-- Mini-Screen Visual Monitor Preview -->
                         <StackPanel Grid.Row="1" Margin="0,0,0,16">
-                            <Border BorderBrush="#263142" BorderThickness="2" CornerRadius="10" Height="195" ClipToBounds="True">
+                            <Border x:Name="QsMonitorBorder" BorderBrush="#263142" BorderThickness="2" CornerRadius="10" Height="205" ClipToBounds="True">
                                 <Border.Background>
                                     <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
                                         <GradientStop Color="#0D1526" Offset="0"/>
@@ -616,7 +627,7 @@
                                     </LinearGradientBrush>
                                 </Border.Background>
                                 <Grid>
-                                    <Viewbox Stretch="Uniform" StretchDirection="DownOnly" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="18,12,18,30">
+                                    <Viewbox Stretch="Uniform" MaxHeight="145" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24,14,24,34">
                                         <Border Background="#E81C1D22" BorderBrush="#41444E" BorderThickness="1.2" CornerRadius="10" Padding="8">
                                             <StackPanel x:Name="QsMiniScreenCardsPanel" Orientation="Horizontal" HorizontalAlignment="Center"/>
                                         </Border>

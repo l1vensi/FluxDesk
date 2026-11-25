@@ -190,7 +190,7 @@ namespace WorkSpace
         /// can use the proper safe uninstall flow (which restores Desktop 1 and creates a backup).
         /// Call this on every startup so the entry is always up-to-date.
         /// </summary>
-        public static void RegisterUninstallEntry(string? uiExePath, string version = "2.1.2-beta")
+        public static void RegisterUninstallEntry(string? uiExePath, string version = "2.2.0-beta")
         {
             const string uninstallKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\FluxDesk";
             try

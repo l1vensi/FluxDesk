@@ -1,6 +1,16 @@
-# FluxDesk
+<p align="center">
+  <img src="assets/logo.png" width="96" alt="FluxDesk Logo" />
+</p>
 
-Lightweight, private desktop workspace manager for Windows 10 & 11 with native shell redirection and zero telemetry.
+<h1 align="center">FluxDesk</h1>
+
+<p align="center">
+  Lightweight, private desktop workspace manager for Windows 10 & 11 with native shell redirection and zero telemetry.
+</p>
+
+## Demo
+
+<video src="https://github.com/l1vensi/FluxDesk/raw/main/assets/demo.mp4" controls width="100%"></video>
 
 ## Features
 

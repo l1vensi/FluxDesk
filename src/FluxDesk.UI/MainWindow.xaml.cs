@@ -1417,7 +1417,7 @@ namespace DeskSpace
             _config.ShowPreviewIcons = (ChkShowPreviewIcons.IsChecked == true);
             _config.Save();
             _previewBitmapCache.Clear();
-            SendIpcCommand("refresh_previews");
+            SendIpcCommand(_config.ShowPreviewIcons ? "set_preview_icons:1" : "set_preview_icons:0");
             _previewReloadTimer.Stop();
             _previewReloadTimer.Start();
         }
@@ -1612,9 +1612,31 @@ namespace DeskSpace
             UpdateWindowClip();
         }
 
+        private WindowState _lastNonMinimizedState = WindowState.Normal;
+
         private void Window_StateChanged(object sender, EventArgs e)
         {
             UpdateWindowClip();
+            if (WindowState != WindowState.Minimized && WindowState != _lastNonMinimizedState)
+            {
+                _lastNonMinimizedState = WindowState;
+                AnimateWindowResizeTransition();
+            }
+        }
+
+        private void AnimateWindowResizeTransition()
+        {
+            if (RightContentGrid == null || RightContentScale == null) return;
+            var ease = new System.Windows.Media.Animation.CubicEase { EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut };
+            var dur = TimeSpan.FromMilliseconds(220);
+
+            var fade = new System.Windows.Media.Animation.DoubleAnimation(0.74, 1.0, dur) { EasingFunction = ease };
+            var scaleX = new System.Windows.Media.Animation.DoubleAnimation(0.985, 1.0, dur) { EasingFunction = ease };
+            var scaleY = new System.Windows.Media.Animation.DoubleAnimation(0.985, 1.0, dur) { EasingFunction = ease };
+
+            RightContentGrid.BeginAnimation(OpacityProperty, fade);
+            RightContentScale.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleXProperty, scaleX);
+            RightContentScale.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty, scaleY);
         }
 
         private void BtnOpenRepo_Click(object sender, RoutedEventArgs e)
@@ -1897,15 +1919,15 @@ namespace DeskSpace
         {
             bool isRu = (lang == "ru");
 
-            TxtNavDesktops.Text = isRu ? "Рабочие столы" : "Desktops";
+            TxtNavDesktops.Text = isRu ? "Рабочие столы" : "Workspaces";
             if (TxtNavQuickSwitcher != null)
                 TxtNavQuickSwitcher.Text = isRu ? "Быстрое меню" : "Quick Switcher";
             TxtNavHotkeys.Text = isRu ? "Горячие клавиши" : "Hotkeys";
             TxtNavSettings.Text = isRu ? "Настройки" : "Settings";
             TxtNavAbout.Text = isRu ? "О программе" : "About";
 
-            TxtTitleDesktops.Text = isRu ? "Рабочие столы" : "Desktops";
-            TxtBtnCreateDesktop.Text = isRu ? "Создать стол" : "Create Desktop";
+            TxtTitleDesktops.Text = isRu ? "Рабочие столы" : "Workspaces";
+            TxtBtnCreateDesktop.Text = isRu ? "Новый стол" : "New Workspace";
             TxtBtnSelectMode.Text = isRu ? "Выбрать" : "Select";
             TxtBtnCancelSelect.Text = isRu ? "Отмена" : "Cancel";
             TxtDaemonWarning.Text = isRu
@@ -1925,14 +1947,14 @@ namespace DeskSpace
             TxtLangTitle.Text = isRu ? "Язык интерфейса" : "Application Language";
             TxtLangDesc.Text = isRu ? "Выберите язык: Английский (по умолчанию) или Русский" : "Choose between English (Default) and Russian";
 
-            TxtSecGeneral.Text = isRu ? "Общие" : "General";
-            TxtPubTitle.Text = isRu ? "Авто-перемещение элементов Общего стола" : "Auto-move Public Desktop items";
-            TxtPubDesc.Text = isRu ? "Автоматически перемещать файлы из Общего рабочего стола на текущий активный стол (может требовать права администратора)" : "Automatically move items from Public Desktop to active desktop on switch (may require admin permissions)";
+            TxtSecGeneral.Text = isRu ? "Поведение столов" : "Workspace Behavior";
+            TxtPubTitle.Text = isRu ? "Изолировать общий рабочий стол" : "Isolate Shared Public Desktop";
+            TxtPubDesc.Text = isRu ? "Автоматически переносить файлы из Общего рабочего стола на активный стол (может требовать права администратора)" : "Automatically move items from Public Desktop to the active workspace (may require admin permissions)";
             string primaryPath = (_config.Desktops.Count > 0 && !string.IsNullOrWhiteSpace(_config.Desktops[0].Path))
                 ? _config.Desktops[0].Path
                 : Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
-            TxtDefFolderTitle.Text = isRu ? "Основная папка рабочего стола" : "Default desktop folder";
-            TxtDefFolderDesc.Text = isRu ? $"Управляется FluxDesk ({primaryPath})" : $"Managed by FluxDesk ({primaryPath})";
+            TxtDefFolderTitle.Text = isRu ? "Папка основного стола" : "Primary Workspace Location";
+            TxtDefFolderDesc.Text = isRu ? $"Текущий путь: {primaryPath}" : $"Active directory: {primaryPath}";
             TxtBtnBrowse.Text = isRu ? "Обзор" : "Browse";
 
             TxtSecPersonalization.Text = isRu ? "Персонализация" : "Personalization";
@@ -1954,29 +1976,29 @@ namespace DeskSpace
             TxtBtnBrowseWe.Text = isRu ? "Обзор..." : "Browse...";
             UpdateWallpaperEngineStatus();
 
-            TxtSecSystem.Text = isRu ? "Система" : "System";
-            TxtStartupTitle.Text = isRu ? "Автозапуск при входе в систему" : "Launch on startup";
-            TxtStartupDesc.Text = isRu ? "Автоматически запускать FluxDesk при старте Windows" : "Automatically start when Windows starts";
+            TxtSecSystem.Text = isRu ? "Интеграция с Windows" : "Windows Integration";
+            TxtStartupTitle.Text = isRu ? "Запуск вместе с Windows" : "Start with Windows";
+            TxtStartupDesc.Text = isRu ? "Автоматически открывать FluxDesk при входе в систему" : "Automatically launch FluxDesk when you sign in";
             TxtRestoreShutdownTitle.Text = isRu ? "Возвращать Стол 1 при выключении ПК" : "Restore Desktop 1 on shutdown/reboot";
             TxtRestoreShutdownDesc.Text = isRu
                 ? "При перезагрузке или выключении Windows возвращать основной рабочий стол. Если выключено — откроется последний активный стол."
                 : "Return to your primary desktop on Windows shutdown or restart. When off, your last active desktop remains active.";
-            TxtCtxMenuTitle.Text = isRu ? "Интеграция в контекстное меню Windows" : "Windows context menu integration";
-            TxtCtxMenuDesc.Text = isRu ? "Добавить пункт FluxDesk в меню правой кнопки мыши на рабочем столе" : "Add FluxDesk entry to desktop right-click menu";
-            TxtTrayTitle.Text = isRu ? "Значок в трее" : "Show tray icon";
-            TxtTrayDesc.Text = isRu ? "Показывать значок FluxDesk в области уведомлений Windows." : "Show the FluxDesk icon in the system tray.";
+            TxtCtxMenuTitle.Text = isRu ? "Меню правой кнопки мыши" : "Desktop Context Menu";
+            TxtCtxMenuDesc.Text = isRu ? "Добавить быстрый переход в контекстное меню рабочего стола" : "Add workspace switcher to the desktop context menu";
+            TxtTrayTitle.Text = isRu ? "Значок в трее" : "Tray Icon";
+            TxtTrayDesc.Text = isRu ? "Отображать иконку FluxDesk в области уведомлений" : "Display FluxDesk in the Windows notification area";
 
-            TxtSecKeyboard.Text = isRu ? "Сочетания клавиш" : "Keyboard Shortcuts";
-            TxtQuickSwitcherTitle.Text = isRu ? "Быстрое переключение (Quick Switcher)" : "Quick Switcher";
-            TxtQuickSwitcherDesc.Text = isRu ? "Включить всплывающее меню для быстрого переключения столов" : "Enable the quick switcher overlay for fast desktop switching";
+            TxtSecKeyboard.Text = isRu ? "Навигация оверлея" : "Overlay Navigation";
+            TxtQuickSwitcherTitle.Text = isRu ? "Оверлей быстрого выбора (Alt + W)" : "Alt + W Quick Overlay";
+            TxtQuickSwitcherDesc.Text = isRu ? "Показывать визуальную панель переключения по горячей клавише" : "Show the visual switcher bar when pressing the shortcut";
             if (TxtBtnConfigureQsSettings != null)
                 TxtBtnConfigureQsSettings.Text = isRu ? "Настроить..." : "Customize...";
             if (ViewQuickSwitcher != null && ViewQuickSwitcher.Visibility == Visibility.Visible)
                 OpenQuickSwitcherTab();
-            TxtQsForwardTitle.Text = isRu ? "Быстрое переключение (Вперед)" : "Quick Switcher (Forward)";
-            TxtQsForwardDesc.Text = isRu ? "Перейти к следующему рабочему столу" : "Cycle to next desktop";
-            TxtQsBackwardTitle.Text = isRu ? "Быстрое переключение (Назад)" : "Quick Switcher (Backward)";
-            TxtQsBackwardDesc.Text = isRu ? "Перейти к предыдущему рабочему столу" : "Cycle to previous desktop";
+            TxtQsForwardTitle.Text = isRu ? "Следующее пространство" : "Next Workspace";
+            TxtQsForwardDesc.Text = isRu ? "Перелистнуть оверлей на следующий стол" : "Move forward in the switcher bar";
+            TxtQsBackwardTitle.Text = isRu ? "Предыдущее пространство" : "Previous Workspace";
+            TxtQsBackwardDesc.Text = isRu ? "Перелистнуть оверлей на предыдущий стол" : "Move backward in the switcher bar";
 
             TxtSecResetSettings.Text = isRu ? "Сброс настроек" : "Reset Settings";
             TxtResetSettingsTitle.Text = isRu ? "Сбросить настройки по умолчанию" : "Reset Settings to Defaults";
@@ -1993,7 +2015,7 @@ namespace DeskSpace
             TxtBtnUninstall.Text = isRu ? "Удалить..." : "Uninstall...";
 
             TxtTitleAbout.Text = isRu ? "О программе FluxDesk" : "About FluxDesk";
-            TxtAboutVersion.Text = isRu ? "Версия 2.1.2 Бета (x64)" : "Version 2.1.2 Beta (x64)";
+            TxtAboutVersion.Text = isRu ? "Версия 2.2.0 Бета (x64)" : "Version 2.2.0 Beta (x64)";
             TxtAboutDesc.Text = isRu ? "Независимый, бесплатный и локальный менеджер рабочих столов для Windows 10 и 11." : "Independent, free & private desktop workspace manager for Windows 10 & 11.";
             TxtAboutF1.Text = isRu ? "• Полностью бесплатно: без подписок, рекламы и ограничений по числу столов." : "• Free & Open Source: No paywalls, no ads, unlimited workspaces.";
             TxtAboutF2.Text = isRu ? "• 100% локально и конфиденциально: без серверов и телеметрии." : "• 100% Private & Local: No servers, no tracking, zero telemetry.";
@@ -2091,6 +2113,13 @@ namespace DeskSpace
 
         private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
         {
+            if (e.Key == Key.F11)
+            {
+                WindowState = (WindowState == WindowState.Maximized) ? WindowState.Normal : WindowState.Maximized;
+                e.Handled = true;
+                return;
+            }
+
             if (RenameModalOverlay.Visibility == Visibility.Visible)
             {
                 if (e.Key == Key.Escape)
@@ -3168,6 +3197,8 @@ namespace DeskSpace
         private void PopulateDesktopCards()
         {
             DesktopCardsPanel.Children.Clear();
+            UpdateDesktopGridMetrics();
+            double thumbHeight = ComputeDesktopThumbHeight();
             bool isRu = (_config.Language == "ru");
 
             BtnEnterSelectMode.Visibility = (_config.Desktops.Count > 1) ? Visibility.Visible : Visibility.Collapsed;
@@ -3193,9 +3224,9 @@ namespace DeskSpace
                         ? (SolidColorBrush)FindResource("AccentBrush")
                         : (isActive ? (SolidColorBrush)FindResource("AccentBrush") : (SolidColorBrush)FindResource("BorderBrush")),
                     BorderThickness = new Thickness((isActive || isSelected) ? 1.5 : 1),
-                    CornerRadius = new CornerRadius(10),
-                    Padding = new Thickness(16),
-                    Margin = new Thickness(0, 0, 0, 14),
+                    CornerRadius = new CornerRadius(12),
+                    Padding = new Thickness(10),
+                    Margin = new Thickness(0, 0, 12, 12),
                     Cursor = _isSelectionMode ? Cursors.Hand : Cursors.Arrow
                 };
 
@@ -3210,60 +3241,20 @@ namespace DeskSpace
                     };
                 }
 
-                var grid = new Grid();
-                if (_isSelectionMode)
-                {
-                    grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(36) });
-                }
-                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(140) });
-                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                var cardRoot = new Grid();
+                cardRoot.RowDefinitions.Add(new RowDefinition { Height = new GridLength(thumbHeight) });
+                cardRoot.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-                int colOffset = 0;
-                if (_isSelectionMode)
-                {
-                    colOffset = 1;
-                    var selBox = new Border
-                    {
-                        Width = 20,
-                        Height = 20,
-                        CornerRadius = new CornerRadius(5),
-                        Background = isSelected ? accentBrush : new SolidColorBrush(Color.FromRgb(24, 29, 38)),
-                        BorderBrush = isSelected ? accentBrush : (Brush)FindResource("BorderBrush"),
-                        BorderThickness = new Thickness(1.5),
-                        VerticalAlignment = VerticalAlignment.Center,
-                        HorizontalAlignment = HorizontalAlignment.Left
-                    };
-                    if (isSelected)
-                    {
-                        selBox.Child = new System.Windows.Shapes.Path
-                        {
-                            Data = (Geometry)FindResource("IconCheck"),
-                            Fill = new SolidColorBrush(Color.FromRgb(13, 17, 23)),
-                            Width = 11,
-                            Height = 11,
-                            Stretch = Stretch.Uniform,
-                            HorizontalAlignment = HorizontalAlignment.Center,
-                            VerticalAlignment = VerticalAlignment.Center
-                        };
-                    }
-                    Grid.SetColumn(selBox, 0);
-                    grid.Children.Add(selBox);
-                }
-
-                // 1. Live Desktop Thumbnail Preview (cached frozen BitmapImage)
+                // 1. Top Large Preview Area
+                var previewContainer = new Grid();
                 var previewBmp = TryLoadPreviewBitmap(deskId);
                 var thumbBorder = new Border
                 {
-                    CornerRadius = new CornerRadius(7),
-                    Width = 124,
-                    Height = 70,
-                    HorizontalAlignment = HorizontalAlignment.Left,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    Margin = new Thickness(0, 0, 16, 0),
+                    CornerRadius = new CornerRadius(8),
+                    ClipToBounds = true,
                     BorderBrush = isActive
-                        ? new SolidColorBrush(Color.FromArgb(120, 190, 230, 253))
-                        : new SolidColorBrush(Color.FromRgb(45, 54, 70)),
+                        ? new SolidColorBrush(Color.FromArgb(140, 190, 230, 253))
+                        : new SolidColorBrush(Color.FromRgb(40, 48, 62)),
                     BorderThickness = new Thickness(1)
                 };
                 if (previewBmp != null)
@@ -3278,27 +3269,120 @@ namespace DeskSpace
                     {
                         Data = (Geometry)FindResource("IconDesktops"),
                         Fill = accentBrush,
-                        Width = 24,
-                        Height = 24,
+                        Width = 30,
+                        Height = 30,
                         Stretch = Stretch.Uniform,
                         HorizontalAlignment = HorizontalAlignment.Center,
                         VerticalAlignment = VerticalAlignment.Center
                     };
                 }
-                Grid.SetColumn(thumbBorder, colOffset + 0);
-                grid.Children.Add(thumbBorder);
+                previewContainer.Children.Add(thumbBorder);
 
-                // 2. Info Block
-                var infoStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 12, 0) };
-                var titleStack = new StackPanel { Orientation = Orientation.Horizontal };
+                // Top-left slot / primary pill
+                string badgeText = (i == 0)
+                    ? (isRu ? $"#{i + 1} · Основной" : $"#{i + 1} · Primary")
+                    : $"#{i + 1}";
+                var indexPill = new Border
+                {
+                    Background = new SolidColorBrush(Color.FromArgb(205, 13, 17, 23)),
+                    BorderBrush = new SolidColorBrush(Color.FromArgb(120, 60, 74, 96)),
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(6),
+                    Padding = new Thickness(8, 3, 8, 3),
+                    HorizontalAlignment = HorizontalAlignment.Left,
+                    VerticalAlignment = VerticalAlignment.Top,
+                    Margin = new Thickness(8)
+                };
+                indexPill.Child = new TextBlock
+                {
+                    Text = badgeText,
+                    FontSize = 11,
+                    FontWeight = FontWeights.SemiBold,
+                    Foreground = Brushes.White
+                };
+                previewContainer.Children.Add(indexPill);
 
+                // Top-right selection checkbox or Active badge
+                if (_isSelectionMode)
+                {
+                    var selBox = new Border
+                    {
+                        Width = 22,
+                        Height = 22,
+                        CornerRadius = new CornerRadius(6),
+                        Background = isSelected ? accentBrush : new SolidColorBrush(Color.FromArgb(215, 20, 26, 36)),
+                        BorderBrush = isSelected ? accentBrush : new SolidColorBrush(Color.FromRgb(100, 116, 139)),
+                        BorderThickness = new Thickness(1.5),
+                        HorizontalAlignment = HorizontalAlignment.Right,
+                        VerticalAlignment = VerticalAlignment.Top,
+                        Margin = new Thickness(8)
+                    };
+                    if (isSelected)
+                    {
+                        selBox.Child = new System.Windows.Shapes.Path
+                        {
+                            Data = (Geometry)FindResource("IconCheck"),
+                            Fill = new SolidColorBrush(Color.FromRgb(13, 17, 23)),
+                            Width = 12,
+                            Height = 12,
+                            Stretch = Stretch.Uniform,
+                            HorizontalAlignment = HorizontalAlignment.Center,
+                            VerticalAlignment = VerticalAlignment.Center
+                        };
+                    }
+                    previewContainer.Children.Add(selBox);
+                }
+                else if (isActive)
+                {
+                    var activePill = new Border
+                    {
+                        Background = new SolidColorBrush(Color.FromArgb(225, 16, 28, 44)),
+                        BorderBrush = accentBrush,
+                        BorderThickness = new Thickness(1),
+                        CornerRadius = new CornerRadius(6),
+                        Padding = new Thickness(8, 3, 8, 3),
+                        HorizontalAlignment = HorizontalAlignment.Right,
+                        VerticalAlignment = VerticalAlignment.Top,
+                        Margin = new Thickness(8)
+                    };
+                    var activePillStack = new StackPanel { Orientation = Orientation.Horizontal };
+                    activePillStack.Children.Add(new System.Windows.Shapes.Path
+                    {
+                        Data = (Geometry)FindResource("IconCheck"),
+                        Fill = accentBrush,
+                        Width = 11,
+                        Height = 11,
+                        Stretch = Stretch.Uniform,
+                        Margin = new Thickness(0, 0, 5, 0),
+                        VerticalAlignment = VerticalAlignment.Center
+                    });
+                    activePillStack.Children.Add(new TextBlock
+                    {
+                        Text = isRu ? "Активен" : "Active",
+                        FontSize = 11,
+                        FontWeight = FontWeights.Bold,
+                        Foreground = accentBrush,
+                        VerticalAlignment = VerticalAlignment.Center
+                    });
+                    activePill.Child = activePillStack;
+                    previewContainer.Children.Add(activePill);
+                }
+
+                Grid.SetRow(previewContainer, 0);
+                cardRoot.Children.Add(previewContainer);
+
+                // 2. Bottom Info & Actions Row
+                var bottomGrid = new Grid { Margin = new Thickness(4, 11, 4, 2) };
+                bottomGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                bottomGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+                var infoStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
                 var titleText = new TextBlock
                 {
                     Text = d.Name,
-                    FontSize = 16,
+                    FontSize = 15,
                     FontWeight = FontWeights.SemiBold,
                     Foreground = (SolidColorBrush)FindResource("TextPrimaryBrush"),
-                    VerticalAlignment = VerticalAlignment.Center,
                     TextTrimming = TextTrimming.CharacterEllipsis,
                     Cursor = Cursors.Hand,
                     ToolTip = _isSelectionMode ? null : (isRu ? "Нажмите, чтобы переименовать" : "Click to rename")
@@ -3307,37 +3391,24 @@ namespace DeskSpace
                 {
                     if (!_isSelectionMode && e.ChangedButton == MouseButton.Left) OpenRenameModalById(deskId);
                 };
-                titleStack.Children.Add(titleText);
-
-                if (i == 0)
-                {
-                    titleStack.Children.Add(new Ellipse
-                    {
-                        Width = 6,
-                        Height = 6,
-                        Fill = accentBrush,
-                        Margin = new Thickness(8, 0, 0, 0),
-                        VerticalAlignment = VerticalAlignment.Center
-                    });
-                }
-                infoStack.Children.Add(titleStack);
+                infoStack.Children.Add(titleText);
 
                 bool hasWallpaper = _config.IndependentWallpapers && !string.IsNullOrWhiteSpace(d.WallpaperPath) && File.Exists(d.WallpaperPath);
                 bool hasWe = _config.WallpaperEngineEnabled && !string.IsNullOrWhiteSpace(d.WallpaperEngineItem);
                 string subtitle = isRu
-                    ? ($"Элементов: {itemCount}" + (i == 0 ? " • Основной стол" : "") + (hasWe ? " • Wallpaper Engine" : (hasWallpaper ? " • Свои обои" : "")))
-                    : ($"Items: {itemCount}" + (i == 0 ? " • OS Default" : "") + (hasWe ? " • Wallpaper Engine" : (hasWallpaper ? " • Custom wallpaper" : "")));
+                    ? ($"{itemCount} файлов" + (hasWe ? " · Wallpaper Engine" : (hasWallpaper ? " · Свои обои" : "")))
+                    : ($"{itemCount} files" + (hasWe ? " · Wallpaper Engine" : (hasWallpaper ? " · Custom wallpaper" : "")));
 
                 infoStack.Children.Add(new TextBlock
                 {
                     Text = subtitle,
-                    FontSize = 12.5,
+                    FontSize = 12,
                     Foreground = secondaryBrush,
                     TextTrimming = TextTrimming.CharacterEllipsis,
-                    Margin = new Thickness(0, 4, 0, 0)
+                    Margin = new Thickness(0, 3, 0, 0)
                 });
-                Grid.SetColumn(infoStack, colOffset + 1);
-                grid.Children.Add(infoStack);
+                Grid.SetColumn(infoStack, 0);
+                bottomGrid.Children.Add(infoStack);
 
                 // 3. Actions Block
                 var actStack = new StackPanel
@@ -3347,38 +3418,15 @@ namespace DeskSpace
                     Visibility = _isSelectionMode ? Visibility.Collapsed : Visibility.Visible
                 };
 
-                if (isActive)
-                {
-                    var activeStack = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 16, 0), VerticalAlignment = VerticalAlignment.Center };
-                    activeStack.Children.Add(new System.Windows.Shapes.Path
-                    {
-                        Data = (Geometry)FindResource("IconCheck"),
-                        Fill = accentBrush,
-                        Width = 14,
-                        Height = 14,
-                        Stretch = Stretch.Uniform,
-                        Margin = new Thickness(0, 0, 6, 0),
-                        VerticalAlignment = VerticalAlignment.Center
-                    });
-                    activeStack.Children.Add(new TextBlock
-                    {
-                        Text = isRu ? "Активен" : "Active",
-                        FontSize = 13,
-                        FontWeight = FontWeights.Bold,
-                        Foreground = accentBrush,
-                        VerticalAlignment = VerticalAlignment.Center
-                    });
-                    actStack.Children.Add(activeStack);
-                }
-                else
+                if (!isActive)
                 {
                     var switchBtn = new Button
                     {
                         Style = (Style)FindResource("AccentButtonStyle"),
-                        Padding = new Thickness(20, 7, 20, 7),
-                        Margin = new Thickness(0, 0, 10, 0),
+                        Padding = new Thickness(14, 6, 14, 6),
+                        Margin = new Thickness(0, 0, 8, 0),
                         Content = isRu ? "Перейти" : "Switch",
-                        FontSize = 13
+                        FontSize = 12.5
                     };
                     switchBtn.Click += (s, e) => SendSwitchCommand(deskId);
                     actStack.Children.Add(switchBtn);
@@ -3387,8 +3435,8 @@ namespace DeskSpace
                 // Options [...] Button with dark vector ContextMenu
                 var moreBtn = new Button
                 {
-                    Width = 34,
-                    Height = 34,
+                    Width = 32,
+                    Height = 32,
                     Background = new SolidColorBrush(Color.FromRgb(32, 38, 50)),
                     BorderThickness = new Thickness(0),
                     Cursor = Cursors.Hand
@@ -3575,11 +3623,64 @@ namespace DeskSpace
                 };
 
                 actStack.Children.Add(moreBtn);
-                Grid.SetColumn(actStack, colOffset + 2);
-                grid.Children.Add(actStack);
+                Grid.SetColumn(actStack, 1);
+                bottomGrid.Children.Add(actStack);
 
-                cardBorder.Child = grid;
+                Grid.SetRow(bottomGrid, 1);
+                cardRoot.Children.Add(bottomGrid);
+
+                cardBorder.Child = cardRoot;
                 DesktopCardsPanel.Children.Add(cardBorder);
+            }
+        }
+
+        private int ComputeDesktopColumns()
+        {
+            double w = DesktopCardsScroll != null && DesktopCardsScroll.ActualWidth > 0 ? DesktopCardsScroll.ActualWidth : 680;
+            if (w >= 1480) return 4;
+            if (w >= 1040) return 3;
+            return 2;
+        }
+
+        private double ComputeDesktopThumbHeight()
+        {
+            double w = DesktopCardsScroll != null && DesktopCardsScroll.ActualWidth > 0 ? DesktopCardsScroll.ActualWidth : 680;
+            int cols = ComputeDesktopColumns();
+            double cardW = Math.Max(220, (w - 16) / cols - 32);
+            return Math.Round(Math.Max(140, Math.Min(215, cardW * 0.5625)));
+        }
+
+        private void UpdateDesktopGridMetrics()
+        {
+            if (DesktopCardsPanel == null) return;
+            DesktopCardsPanel.Columns = ComputeDesktopColumns();
+            double thumbH = ComputeDesktopThumbHeight();
+            foreach (var child in DesktopCardsPanel.Children)
+            {
+                if (child is Border b && b.Child is Grid g && g.RowDefinitions.Count > 0)
+                {
+                    g.RowDefinitions[0].Height = new GridLength(thumbH);
+                }
+            }
+        }
+
+        private void DesktopCardsScroll_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            UpdateDesktopGridMetrics();
+        }
+
+        private void ViewQuickSwitcher_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            if (ViewQuickSwitcher == null) return;
+            double w = ViewQuickSwitcher.ActualWidth;
+            double h = ViewQuickSwitcher.ActualHeight;
+            if (QsConfigListPanel != null)
+            {
+                QsConfigListPanel.Columns = (w >= 760) ? 3 : 2;
+            }
+            if (QsMonitorBorder != null && h > 0)
+            {
+                QsMonitorBorder.Height = Math.Round(Math.Max(195, Math.Min(280, h * 0.34)));
             }
         }
 
@@ -4538,22 +4639,22 @@ namespace DeskSpace
                         : new SolidColorBrush(Color.FromRgb(19, 23, 31)),
                     BorderBrush = isIncluded ? accentBorder : cardBorder,
                     BorderThickness = new Thickness(1),
-                    CornerRadius = new CornerRadius(8),
-                    Padding = new Thickness(8),
-                    Margin = new Thickness(4),
+                    CornerRadius = new CornerRadius(10),
+                    Padding = new Thickness(12, 11, 12, 11),
+                    Margin = new Thickness(5),
                     Cursor = Cursors.Hand
                 };
 
                 var tileGrid = new Grid();
-                tileGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(66) });
+                tileGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(96) });
                 tileGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 tileGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
                 var thumbBox = new Border
                 {
-                    Width = 60,
-                    Height = 38,
-                    CornerRadius = new CornerRadius(5),
+                    Width = 84,
+                    Height = 48,
+                    CornerRadius = new CornerRadius(6),
                     ClipToBounds = true,
                     Background = new SolidColorBrush(Color.FromRgb(13, 18, 28)),
                     HorizontalAlignment = HorizontalAlignment.Left,
@@ -4562,16 +4663,17 @@ namespace DeskSpace
                 var tileBmp = TryLoadPreviewBitmap(d.Id);
                 if (tileBmp != null)
                 {
+                    RenderOptions.SetBitmapScalingMode(thumbBox, BitmapScalingMode.HighQuality);
                     thumbBox.Child = new Image { Source = tileBmp, Stretch = Stretch.UniformToFill };
                 }
                 Grid.SetColumn(thumbBox, 0);
                 tileGrid.Children.Add(thumbBox);
 
-                var infoStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(4, 0, 6, 0) };
+                var infoStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(4, 0, 8, 0) };
                 infoStack.Children.Add(new TextBlock
                 {
                     Text = d.Name,
-                    FontSize = 12.5,
+                    FontSize = 13.5,
                     FontWeight = FontWeights.SemiBold,
                     Foreground = textPrimary,
                     TextTrimming = TextTrimming.CharacterEllipsis
@@ -4581,17 +4683,18 @@ namespace DeskSpace
                     Text = isIncluded
                         ? (isRu ? $"В меню: #{posIndex + 1}" : $"Position #{posIndex + 1}")
                         : (isRu ? "Скрыт (только в окне)" : "App only"),
-                    FontSize = 10.5,
-                    Foreground = isIncluded ? accentBrush : secondaryBrush
+                    FontSize = 11.5,
+                    Foreground = isIncluded ? accentBrush : secondaryBrush,
+                    Margin = new Thickness(0, 2, 0, 0)
                 });
                 Grid.SetColumn(infoStack, 1);
                 tileGrid.Children.Add(infoStack);
 
                 var slotBadge = new Border
                 {
-                    Width = 24,
-                    Height = 24,
-                    CornerRadius = new CornerRadius(6),
+                    Width = 28,
+                    Height = 28,
+                    CornerRadius = new CornerRadius(7),
                     Background = isIncluded
                         ? (Brush)FindResource("AccentTintBrush")
                         : new SolidColorBrush(Color.FromRgb(26, 32, 42)),
@@ -4602,7 +4705,7 @@ namespace DeskSpace
                 slotBadge.Child = new TextBlock
                 {
                     Text = isIncluded ? $"{posIndex + 1}" : "+",
-                    FontSize = 12,
+                    FontSize = 12.5,
                     FontWeight = FontWeights.Bold,
                     Foreground = isIncluded ? accentBrush : secondaryBrush,
                     HorizontalAlignment = HorizontalAlignment.Center,

@@ -13,8 +13,8 @@ namespace WorkSpace
 {
     public static class DesktopPreviewGenerator
     {
-        public const int PreviewWidth = 256;
-        public const int PreviewHeight = 144;
+        public const int PreviewWidth = 640;
+        public const int PreviewHeight = 360;
         private const int MaxExtIconCacheEntries = 128;
 
         private const uint SHGFI_ICON = 0x000000100;
@@ -334,7 +334,7 @@ namespace WorkSpace
                     // 4. Render miniature icons
                     float sx = (float)PreviewWidth / screen.Width;
                     float sy = (float)PreviewHeight / screen.Height;
-                    int iconSize = Math.Clamp((int)Math.Round(Math.Min(76 * sx, 82 * sy) * 0.78f), 7, 11);
+                    int iconSize = Math.Clamp((int)Math.Round(Math.Min(76 * sx, 82 * sy) * 0.78f), 14, 28);
 
                     using var labelShadowBrush = new SolidBrush(Color.FromArgb(145, 0, 0, 0));
                     using var labelBarBrush = new SolidBrush(Color.FromArgb(200, 238, 245, 255));
@@ -363,13 +363,13 @@ namespace WorkSpace
                                 g.FillRectangle(fallbackBrush, drawX + 1, drawY + 1, iconSize - 2, iconSize - 2);
                             }
 
-                            int barW = Math.Max(4, iconSize - 2);
+                            int barW = Math.Max(8, iconSize - 4);
                             int barX = drawX + (iconSize - barW) / 2;
-                            int barY = drawY + iconSize + 1;
-                            if (barY < PreviewHeight - 1)
+                            int barY = drawY + iconSize + 2;
+                            if (barY < PreviewHeight - 2)
                             {
-                                g.FillRectangle(labelShadowBrush, barX, barY + 1, barW, 1);
-                                g.FillRectangle(labelBarBrush, barX, barY, barW, 1);
+                                g.FillRectangle(labelShadowBrush, barX, barY + 1, barW, 2);
+                                g.FillRectangle(labelBarBrush, barX, barY, barW, 2);
                             }
                         }
                         finally
@@ -388,6 +388,7 @@ namespace WorkSpace
             try
             {
                 canvas.Save(tempFile, ImageFormat.Png);
+                try { File.SetLastWriteTimeUtc(tempFile, DateTime.UtcNow); } catch { }
                 for (int attempt = 0; attempt < 5; attempt++)
                 {
                     if (_shuttingDown || IsDeleted(job.DesktopId)) return;

@@ -468,6 +468,16 @@ namespace WorkSpace
                     RefreshAllPreviewsAsync();
                 }));
             }
+            else if (text.StartsWith("set_preview_icons:", StringComparison.OrdinalIgnoreCase))
+            {
+                bool enable = text.EndsWith(":1", StringComparison.Ordinal);
+                _switcher.BeginInvoke(new Action(() =>
+                {
+                    _config.ShowPreviewIcons = enable;
+                    _switcher.ClearPreviewCache();
+                    RefreshAllPreviewsAsync();
+                }));
+            }
         }
 
         private void SetupConfigWatcher()
@@ -1321,71 +1331,43 @@ namespace WorkSpace
 
         private void UpdateTrayIcon()
         {
-            IntPtr newHIcon = IntPtr.Zero;
-            Icon? newIcon = null;
             try
             {
-                using var bmp = new Bitmap(32, 32);
-                using (var g = Graphics.FromImage(bmp))
+                string exePath = Environment.ProcessPath ?? Application.ExecutablePath;
+                Icon? appIcon = !string.IsNullOrWhiteSpace(exePath) && File.Exists(exePath)
+                    ? Icon.ExtractAssociatedIcon(exePath)
+                    : null;
+
+                if (appIcon != null)
                 {
-                    g.SmoothingMode = SmoothingMode.AntiAlias;
-                    g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
-                    g.Clear(Color.Transparent);
+                    var oldIcon = _trayIcon.Icon;
+                    IntPtr oldHIcon = _currentTrayHIcon;
 
-                    var rect = new Rectangle(1, 1, 29, 29);
-                    int r = 7;
-                    using var path = new GraphicsPath();
-                    path.AddArc(rect.X, rect.Y, r * 2, r * 2, 180, 90);
-                    path.AddArc(rect.Right - r * 2, rect.Y, r * 2, r * 2, 270, 90);
-                    path.AddArc(rect.Right - r * 2, rect.Bottom - r * 2, r * 2, r * 2, 0, 90);
-                    path.AddArc(rect.X, rect.Bottom - r * 2, r * 2, r * 2, 90, 90);
-                    path.CloseFigure();
+                    _trayIcon.Icon = (Icon)appIcon.Clone();
+                    _currentTrayHIcon = IntPtr.Zero;
+                    appIcon.Dispose();
 
-                    using var bgBrush = new SolidBrush(Color.FromArgb(20, 22, 27));
-                    g.FillPath(bgBrush, path);
-
-                    using var borderPen = new Pen(Color.FromArgb(190, 230, 253), 1.6f);
-                    g.DrawPath(borderPen, path);
-
-                    using var font = new Font("Segoe UI", 16, FontStyle.Bold, GraphicsUnit.Pixel);
-                    using var sf = new StringFormat
+                    if (oldIcon != null && !ReferenceEquals(oldIcon, SystemIcons.Application))
                     {
-                        Alignment = StringAlignment.Center,
-                        LineAlignment = StringAlignment.Center
-                    };
-                    string num = (_config.CurrentIndex + 1).ToString();
-                    using var textBrush = new SolidBrush(Color.FromArgb(245, 248, 255));
-                    g.DrawString(num, font, textBrush, new RectangleF(0, 0, 32, 32), sf);
-                }
+                        oldIcon.Dispose();
+                    }
+                    if (oldHIcon != IntPtr.Zero)
+                    {
+                        DestroyIcon(oldHIcon);
+                    }
 
-                newHIcon = bmp.GetHicon();
-                newIcon = Icon.FromHandle(newHIcon);
-
-                var oldIcon = _trayIcon.Icon;
-                IntPtr oldHIcon = _currentTrayHIcon;
-
-                // Assign _trayIcon.Icon BEFORE transferring ownership of _currentTrayHIcon
-                _trayIcon.Icon = newIcon;
-                _currentTrayHIcon = newHIcon;
-                newHIcon = IntPtr.Zero;
-                newIcon = null;
-
-                if (oldIcon != null && !ReferenceEquals(oldIcon, SystemIcons.Application))
-                {
-                    oldIcon.Dispose();
-                }
-                if (oldHIcon != IntPtr.Zero)
-                {
-                    DestroyIcon(oldHIcon);
+                    string activeName = (_config.CurrentIndex >= 0 && _config.CurrentIndex < _config.Desktops.Count)
+                        ? _config.Desktops[_config.CurrentIndex].Name
+                        : "FluxDesk";
+                    _trayIcon.Text = $"FluxDesk — {activeName}";
+                    return;
                 }
             }
             catch (Exception ex)
             {
-                newIcon?.Dispose();
-                if (newHIcon != IntPtr.Zero) DestroyIcon(newHIcon);
                 Log($"TrayIcon error: {ex.Message}");
-                _trayIcon.Icon = SystemIcons.Application;
             }
+            _trayIcon.Icon = SystemIcons.Application;
         }
 
         private void SaveCurrentLayoutIfRestored()
