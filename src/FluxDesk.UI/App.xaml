@@ -374,10 +374,13 @@
             </Setter>
         </Style>
 
-        <!-- Custom ScrollBar Style (Supports Vertical & Horizontal + Track Page Clicks) -->
+        <!-- Custom ScrollBar Style (Slim, Modern, Supports Vertical & Horizontal) -->
         <Style TargetType="{x:Type ScrollBar}">
-            <Setter Property="Width" Value="7"/>
+            <Setter Property="Width" Value="5"/>
+            <Setter Property="MinWidth" Value="5"/>
+            <Setter Property="Margin" Value="4,2,2,2"/>
             <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Opacity" Value="0.75"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="{x:Type ScrollBar}">
@@ -386,13 +389,13 @@
                                 <RepeatButton Command="ScrollBar.PageUpCommand" Opacity="0" Focusable="False"/>
                             </Track.DecreaseRepeatButton>
                             <Track.Thumb>
-                                <Thumb MinHeight="24" MinWidth="24">
+                                <Thumb MinHeight="28" MinWidth="28">
                                     <Thumb.Template>
                                         <ControlTemplate TargetType="{x:Type Thumb}">
-                                            <Border x:Name="thumbBd" CornerRadius="3.5" Background="#273345"/>
+                                            <Border x:Name="thumbBd" CornerRadius="2.5" Background="#34435A"/>
                                             <ControlTemplate.Triggers>
                                                 <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter TargetName="thumbBd" Property="Background" Value="#3B4D68"/>
+                                                    <Setter TargetName="thumbBd" Property="Background" Value="#4C6282"/>
                                                 </Trigger>
                                                 <Trigger Property="IsDragging" Value="True">
                                                     <Setter TargetName="thumbBd" Property="Background" Value="{StaticResource AccentBrush}"/>
@@ -407,9 +410,15 @@
                             </Track.IncreaseRepeatButton>
                         </Track>
                         <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Opacity" Value="1.0"/>
+                            </Trigger>
                             <Trigger Property="Orientation" Value="Horizontal">
                                 <Setter Property="Width" Value="Auto"/>
-                                <Setter Property="Height" Value="7"/>
+                                <Setter Property="MinWidth" Value="0"/>
+                                <Setter Property="Height" Value="5"/>
+                                <Setter Property="MinHeight" Value="5"/>
+                                <Setter Property="Margin" Value="2,4,2,2"/>
                                 <Setter TargetName="PART_Track" Property="IsDirectionReversed" Value="False"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
