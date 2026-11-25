@@ -1989,7 +1989,7 @@ namespace DeskSpace
             TxtBtnUninstall.Text = isRu ? "Удалить..." : "Uninstall...";
 
             TxtTitleAbout.Text = isRu ? "О программе FluxDesk" : "About FluxDesk";
-            TxtAboutVersion.Text = isRu ? "Версия 2.1.0 (x64 Релиз)" : "Version 2.1.0 (x64 Release)";
+            TxtAboutVersion.Text = isRu ? "Версия 2.1.1 Бета (x64)" : "Version 2.1.1 Beta (x64)";
             TxtAboutDesc.Text = isRu ? "Независимый, бесплатный и локальный менеджер рабочих столов для Windows 10 и 11." : "Independent, free & private desktop workspace manager for Windows 10 & 11.";
             TxtAboutF1.Text = isRu ? "• Полностью бесплатно: без подписок, рекламы и ограничений по числу столов." : "• Free & Open Source: No paywalls, no ads, unlimited workspaces.";
             TxtAboutF2.Text = isRu ? "• 100% локально и конфиденциально: без серверов и телеметрии." : "• 100% Private & Local: No servers, no tracking, zero telemetry.";
