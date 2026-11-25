@@ -76,6 +76,8 @@ namespace DeskSpace
         public bool ContextMenuIntegration { get; set; } = false;
         public bool ShowTrayIcon { get; set; } = true;
         public bool QuickSwitcherEnabled { get; set; } = true;
+        public bool QuickSwitcherCustomSelection { get; set; } = false;
+        public List<string> QuickSwitcherDesktopIds { get; set; } = new List<string>();
         public bool ShowPreviewIcons { get; set; } = true;
         public bool WallpaperEngineEnabled { get; set; } = false;
         public string WallpaperEngineExe { get; set; } = "";
@@ -103,6 +105,32 @@ namespace DeskSpace
         );
 
         public static bool IsSafeId(string? id) => !string.IsNullOrWhiteSpace(id) && SafeIdRegex.IsMatch(id);
+
+        public List<DesktopInfo> GetQuickSwitcherDesktops()
+        {
+            var result = new List<DesktopInfo>();
+            if (QuickSwitcherCustomSelection)
+            {
+                foreach (var id in QuickSwitcherDesktopIds)
+                {
+                    var d = Desktops.FirstOrDefault(x => x.Id == id);
+                    if (d != null && !result.Contains(d))
+                    {
+                        result.Add(d);
+                        if (result.Count >= 9) break;
+                    }
+                }
+            }
+            else
+            {
+                foreach (var d in Desktops)
+                {
+                    result.Add(d);
+                    if (result.Count >= 9) break;
+                }
+            }
+            return result;
+        }
 
         public static string GetUniqueDesktopPath(List<DesktopInfo> existing, string prefix, out string finalName)
         {
@@ -981,7 +1009,8 @@ namespace DeskSpace
                    DeleteModalOverlay.Visibility == Visibility.Visible ||
                    ConflictModalOverlay.Visibility == Visibility.Visible ||
                    UninstallModalOverlay.Visibility == Visibility.Visible ||
-                   (WeModalOverlay != null && WeModalOverlay.Visibility == Visibility.Visible);
+                   (WeModalOverlay != null && WeModalOverlay.Visibility == Visibility.Visible) ||
+                   (QsConfigModalOverlay != null && QsConfigModalOverlay.Visibility == Visibility.Visible);
         }
 
         private void SetModalState(Grid overlay, bool open, Control? focusTarget = null)
@@ -1936,6 +1965,10 @@ namespace DeskSpace
             TxtSecKeyboard.Text = isRu ? "Сочетания клавиш" : "Keyboard Shortcuts";
             TxtQuickSwitcherTitle.Text = isRu ? "Быстрое переключение (Quick Switcher)" : "Quick Switcher";
             TxtQuickSwitcherDesc.Text = isRu ? "Включить всплывающее меню для быстрого переключения столов" : "Enable the quick switcher overlay for fast desktop switching";
+            if (TxtBtnConfigureQs != null)
+                TxtBtnConfigureQs.Text = isRu ? "Настроить Alt + W" : "Alt + W (max 9)";
+            if (TxtBtnConfigureQsSettings != null)
+                TxtBtnConfigureQsSettings.Text = isRu ? "Настроить (до 9)..." : "Customize (max 9)...";
             TxtQsForwardTitle.Text = isRu ? "Быстрое переключение (Вперед)" : "Quick Switcher (Forward)";
             TxtQsForwardDesc.Text = isRu ? "Перейти к следующему рабочему столу" : "Cycle to next desktop";
             TxtQsBackwardTitle.Text = isRu ? "Быстрое переключение (Назад)" : "Quick Switcher (Backward)";
@@ -2094,6 +2127,16 @@ namespace DeskSpace
                 if (e.Key == Key.Escape)
                 {
                     CloseUninstallModal();
+                    e.Handled = true;
+                }
+                return;
+            }
+
+            if (QsConfigModalOverlay != null && QsConfigModalOverlay.Visibility == Visibility.Visible)
+            {
+                if (e.Key == Key.Escape)
+                {
+                    CloseQsConfigModal();
                     e.Handled = true;
                 }
                 return;
@@ -4100,6 +4143,333 @@ namespace DeskSpace
                 }
                 catch { }
             });
+        }
+
+        #endregion
+
+        #region Quick Switcher (Alt + W) Visual Mini-Screen Editor
+
+        private List<string> _editingQsIds = new List<string>();
+
+        private void BtnConfigureQuickSwitcher_Click(object sender, RoutedEventArgs e)
+        {
+            _editingQsIds = _config.GetQuickSwitcherDesktops().Select(d => d.Id).ToList();
+            bool isRu = _config.Language == "ru";
+
+            TxtQsModalTitle.Text = isRu ? "Настройка быстрого меню (Alt + W)" : "Quick Switcher Layout (Alt + W)";
+            TxtQsModalSub.Text = isRu
+                ? "Выберите до 9 рабочих столов, которые будут показаны в Alt + W. Остальные всегда доступны в приложении."
+                : "Select up to 9 workspaces to display in Alt + W. All other workspaces remain accessible in the app.";
+            TxtQsMiniScreenBadge.Text = isRu ? "МИНИ-ЭКРАН (КАК БУДЕТ ВЫГЛЯДЕТЬ НА МОНИТОРЕ)" : "LIVE MONITOR PREVIEW";
+            TxtQsLimitNotice.Text = isRu
+                ? "Достигнут лимит: максимум 9 рабочих столов в быстром меню Alt + W."
+                : "Limit reached: maximum 9 workspaces can be added to Alt + W.";
+            TxtQsLimitNotice.Visibility = Visibility.Collapsed;
+
+            TxtQsModalReset.Text = isRu ? "По умолчанию (первые 9)" : "Reset (First 9)";
+            TxtQsModalCancel.Text = isRu ? "Отмена" : "Cancel";
+            TxtQsModalSave.Text = isRu ? "Сохранить" : "Save";
+
+            RefreshQsConfigView();
+            SetModalState(QsConfigModalOverlay, true, BtnQsModalSave);
+        }
+
+        private void CloseQsConfigModal() => SetModalState(QsConfigModalOverlay, false);
+
+        private void BtnQsModalCancel_Click(object sender, RoutedEventArgs e) => CloseQsConfigModal();
+
+        private void BtnQsModalReset_Click(object sender, RoutedEventArgs e)
+        {
+            _editingQsIds = _config.Desktops.Take(9).Select(d => d.Id).ToList();
+            TxtQsLimitNotice.Visibility = Visibility.Collapsed;
+            RefreshQsConfigView();
+        }
+
+        private void BtnQsModalSave_Click(object sender, RoutedEventArgs e)
+        {
+            _config.QuickSwitcherCustomSelection = true;
+            _config.QuickSwitcherDesktopIds = _editingQsIds.Take(9).ToList();
+            _config.Save();
+            CloseQsConfigModal();
+        }
+
+        private void RefreshQsConfigView()
+        {
+            bool isRu = _config.Language == "ru";
+            _editingQsIds = _editingQsIds
+                .Where(id => _config.Desktops.Any(d => d.Id == id))
+                .Distinct()
+                .Take(9)
+                .ToList();
+
+            TxtQsCounter.Text = isRu
+                ? $"Выбрано: {_editingQsIds.Count} / 9"
+                : $"Selected: {_editingQsIds.Count} / 9";
+
+            // 1. Render Live Mini-Screen Cards
+            QsMiniScreenCardsPanel.Children.Clear();
+            var accentBrush = (Brush)FindResource("AccentBrush");
+            var textPrimary = (Brush)FindResource("TextPrimaryBrush");
+
+            int count = _editingQsIds.Count;
+            if (count == 0)
+            {
+                QsMiniScreenCardsPanel.Children.Add(new TextBlock
+                {
+                    Text = isRu ? "Нет выбранных столов" : "No workspaces selected",
+                    FontSize = 11.5,
+                    Foreground = (Brush)FindResource("TextSecondaryBrush"),
+                    Margin = new Thickness(16, 14, 16, 14)
+                });
+            }
+            else
+            {
+                // Scale card width smoothly so 1..9 cards always fit in 1 sleek row inside the mini-screen
+                double miniCardW = count <= 5 ? 104 : Math.Max(70, (760.0 - (count - 1) * 6) / count);
+                double miniCardH = Math.Round(miniCardW * (104.0 / 178.0));
+
+                string activeId = (_config.CurrentIndex >= 0 && _config.CurrentIndex < _config.Desktops.Count)
+                    ? _config.Desktops[_config.CurrentIndex].Id
+                    : "";
+
+                for (int i = 0; i < count; i++)
+                {
+                    string id = _editingQsIds[i];
+                    var d = _config.Desktops.First(x => x.Id == id);
+                    bool isActive = (d.Id == activeId);
+
+                    var miniCard = new Border
+                    {
+                        Width = miniCardW,
+                        Height = miniCardH,
+                        Margin = new Thickness(i == 0 ? 0 : 6, 0, 0, 0),
+                        CornerRadius = new CornerRadius(5),
+                        Background = new SolidColorBrush(Color.FromRgb(34, 36, 42)),
+                        BorderBrush = isActive ? accentBrush : new SolidColorBrush(Color.FromRgb(65, 68, 78)),
+                        BorderThickness = new Thickness(isActive ? 1.8 : 1),
+                        ClipToBounds = true
+                    };
+
+                    var cardGrid = new Grid();
+                    var bmp = TryLoadPreviewBitmap(d.Id);
+                    if (bmp != null)
+                    {
+                        cardGrid.Children.Add(new Image
+                        {
+                            Source = bmp,
+                            Stretch = Stretch.UniformToFill,
+                            Margin = new Thickness(2)
+                        });
+                    }
+                    else
+                    {
+                        cardGrid.Children.Add(new Border
+                        {
+                            Margin = new Thickness(2),
+                            CornerRadius = new CornerRadius(3),
+                            Background = new LinearGradientBrush(
+                                Color.FromRgb(20, 40, 75),
+                                Color.FromRgb(10, 20, 40),
+                                45)
+                        });
+                    }
+
+                    // Bottom gradient bar with slot number & name
+                    var labelBar = new Border
+                    {
+                        VerticalAlignment = VerticalAlignment.Bottom,
+                        Background = new SolidColorBrush(Color.FromArgb(195, 13, 17, 23)),
+                        Padding = new Thickness(4, 2, 4, 2)
+                    };
+                    labelBar.Child = new TextBlock
+                    {
+                        Text = $"{i + 1}. {d.Name}",
+                        FontSize = count <= 6 ? 9.5 : 8.5,
+                        FontWeight = FontWeights.SemiBold,
+                        Foreground = isActive ? accentBrush : textPrimary,
+                        TextTrimming = TextTrimming.CharacterEllipsis
+                    };
+                    cardGrid.Children.Add(labelBar);
+
+                    miniCard.Child = cardGrid;
+                    QsMiniScreenCardsPanel.Children.Add(miniCard);
+                }
+            }
+
+            // 2. Render Reorderable & Checkable List of All Workspaces
+            QsConfigListPanel.Children.Clear();
+            var secondaryBrush = (Brush)FindResource("TextSecondaryBrush");
+            var cardBorder = (Brush)FindResource("BorderBrush");
+
+            // Selected ones first (in order), then remaining workspaces
+            var orderedList = new List<DesktopInfo>();
+            foreach (var id in _editingQsIds)
+            {
+                var d = _config.Desktops.FirstOrDefault(x => x.Id == id);
+                if (d != null) orderedList.Add(d);
+            }
+            foreach (var d in _config.Desktops)
+            {
+                if (!orderedList.Contains(d)) orderedList.Add(d);
+            }
+
+            foreach (var d in orderedList)
+            {
+                int posIndex = _editingQsIds.IndexOf(d.Id);
+                bool isIncluded = posIndex >= 0;
+
+                var rowBorder = new Border
+                {
+                    Background = isIncluded
+                        ? new SolidColorBrush(Color.FromRgb(22, 29, 41))
+                        : new SolidColorBrush(Color.FromRgb(18, 21, 28)),
+                    BorderBrush = isIncluded ? (Brush)FindResource("AccentBorderBrush") : cardBorder,
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(7),
+                    Padding = new Thickness(10, 7, 10, 7),
+                    Margin = new Thickness(0, 0, 0, 6)
+                };
+
+                var rowGrid = new Grid();
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(36) });
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+                // Slot badge
+                var badge = new Border
+                {
+                    Width = 26,
+                    Height = 26,
+                    CornerRadius = new CornerRadius(6),
+                    Background = isIncluded
+                        ? (Brush)FindResource("AccentTintBrush")
+                        : new SolidColorBrush(Color.FromRgb(28, 33, 44)),
+                    HorizontalAlignment = HorizontalAlignment.Left,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                badge.Child = new TextBlock
+                {
+                    Text = isIncluded ? $"{posIndex + 1}" : "-",
+                    FontSize = 12,
+                    FontWeight = FontWeights.Bold,
+                    Foreground = isIncluded ? accentBrush : secondaryBrush,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                Grid.SetColumn(badge, 0);
+                rowGrid.Children.Add(badge);
+
+                // Name & status
+                var namePanel = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(4, 0, 10, 0) };
+                namePanel.Children.Add(new TextBlock
+                {
+                    Text = d.Name,
+                    FontSize = 13,
+                    FontWeight = FontWeights.SemiBold,
+                    Foreground = textPrimary,
+                    TextTrimming = TextTrimming.CharacterEllipsis
+                });
+                namePanel.Children.Add(new TextBlock
+                {
+                    Text = isIncluded
+                        ? (isRu ? $"Позиция #{posIndex + 1} в Alt + W" : $"Slot #{posIndex + 1} in Alt + W")
+                        : (isRu ? "Только через главное окно" : "App window only"),
+                    FontSize = 11,
+                    Foreground = secondaryBrush
+                });
+                Grid.SetColumn(namePanel, 1);
+                rowGrid.Children.Add(namePanel);
+
+                // Up/Down buttons if included
+                if (isIncluded)
+                {
+                    var movePanel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 12, 0) };
+
+                    var btnUp = new Button
+                    {
+                        Style = (Style)FindResource("SecondaryButtonStyle"),
+                        Width = 28,
+                        Height = 26,
+                        Padding = new Thickness(0),
+                        Margin = new Thickness(0, 0, 4, 0),
+                        Content = "▲",
+                        FontSize = 10,
+                        IsEnabled = posIndex > 0,
+                        Opacity = posIndex > 0 ? 1.0 : 0.35
+                    };
+                    string capturedId = d.Id;
+                    btnUp.Click += (s, ev) =>
+                    {
+                        int idx = _editingQsIds.IndexOf(capturedId);
+                        if (idx > 0)
+                        {
+                            (_editingQsIds[idx - 1], _editingQsIds[idx]) = (_editingQsIds[idx], _editingQsIds[idx - 1]);
+                            RefreshQsConfigView();
+                        }
+                    };
+
+                    var btnDown = new Button
+                    {
+                        Style = (Style)FindResource("SecondaryButtonStyle"),
+                        Width = 28,
+                        Height = 26,
+                        Padding = new Thickness(0),
+                        Content = "▼",
+                        FontSize = 10,
+                        IsEnabled = posIndex < _editingQsIds.Count - 1,
+                        Opacity = posIndex < _editingQsIds.Count - 1 ? 1.0 : 0.35
+                    };
+                    btnDown.Click += (s, ev) =>
+                    {
+                        int idx = _editingQsIds.IndexOf(capturedId);
+                        if (idx >= 0 && idx < _editingQsIds.Count - 1)
+                        {
+                            (_editingQsIds[idx], _editingQsIds[idx + 1]) = (_editingQsIds[idx + 1], _editingQsIds[idx]);
+                            RefreshQsConfigView();
+                        }
+                    };
+
+                    movePanel.Children.Add(btnUp);
+                    movePanel.Children.Add(btnDown);
+                    Grid.SetColumn(movePanel, 2);
+                    rowGrid.Children.Add(movePanel);
+                }
+
+                // ToggleSwitch
+                var toggle = new CheckBox
+                {
+                    Style = (Style)FindResource("ToggleSwitchStyle"),
+                    IsChecked = isIncluded,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                string deskId = d.Id;
+                toggle.Click += (s, ev) =>
+                {
+                    if (_editingQsIds.Contains(deskId))
+                    {
+                        _editingQsIds.Remove(deskId);
+                        TxtQsLimitNotice.Visibility = Visibility.Collapsed;
+                    }
+                    else
+                    {
+                        if (_editingQsIds.Count >= 9)
+                        {
+                            toggle.IsChecked = false;
+                            TxtQsLimitNotice.Visibility = Visibility.Visible;
+                            return;
+                        }
+                        _editingQsIds.Add(deskId);
+                        TxtQsLimitNotice.Visibility = Visibility.Collapsed;
+                    }
+                    RefreshQsConfigView();
+                };
+                Grid.SetColumn(toggle, 3);
+                rowGrid.Children.Add(toggle);
+
+                rowBorder.Child = rowGrid;
+                QsConfigListPanel.Children.Add(rowBorder);
+            }
         }
 
         #endregion

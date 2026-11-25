@@ -567,6 +567,8 @@ namespace WorkSpace
             _config.ContextMenuIntegration = newCfg.ContextMenuIntegration;
             _config.ShowTrayIcon = newCfg.ShowTrayIcon;
             _config.QuickSwitcherEnabled = newCfg.QuickSwitcherEnabled;
+            _config.QuickSwitcherCustomSelection = newCfg.QuickSwitcherCustomSelection;
+            _config.QuickSwitcherDesktopIds = newCfg.QuickSwitcherDesktopIds ?? new List<string>();
             _config.ShowPreviewIcons = newCfg.ShowPreviewIcons;
             _config.WallpaperEngineEnabled = newCfg.WallpaperEngineEnabled;
             _config.WallpaperEngineExe = newCfg.WallpaperEngineExe;

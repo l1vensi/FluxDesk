@@ -47,6 +47,9 @@ namespace WorkSpace
 
         private int _selectedIndex = 0;
         private int _columnsPerRow = 1;
+        private int _effectiveCardWidth = BASE_CARD_WIDTH;
+        private int _effectiveCardHeight = BASE_CARD_HEIGHT;
+        private List<DesktopInfo> _qsDesktops = new List<DesktopInfo>();
         private volatile bool _isSwitcherVisible = false;
         private readonly System.Windows.Forms.Timer _altWatchdogTimer;
         private Image? _cachedWallpaper = null;
@@ -144,14 +147,16 @@ namespace WorkSpace
                 _previewCache.Remove(k);
             }
 
-            if (!_config.QuickSwitcherEnabled || _config.Desktops.Count == 0)
+            _qsDesktops = _config.GetQuickSwitcherDesktops();
+
+            if (!_config.QuickSwitcherEnabled || _qsDesktops.Count == 0)
             {
                 if (_isSwitcherVisible) CancelAndClose();
                 return;
             }
 
-            if (_selectedIndex >= _config.Desktops.Count)
-                _selectedIndex = Math.Max(0, _config.Desktops.Count - 1);
+            if (_selectedIndex >= _qsDesktops.Count)
+                _selectedIndex = Math.Max(0, _qsDesktops.Count - 1);
 
             if (_isSwitcherVisible)
             {
@@ -162,19 +167,29 @@ namespace WorkSpace
 
         private void LayoutWindowOnActiveScreen()
         {
+            _qsDesktops = _config.GetQuickSwitcherDesktops();
             var screen = Screen.FromPoint(Cursor.Position).WorkingArea;
-            int totalCards = Math.Max(1, _config.Desktops.Count);
+            int totalCards = Math.Max(1, _qsDesktops.Count);
             int cw = CardWidth;
             int ch = CardHeight;
             int gap = Gap;
             int pad = Pad;
 
-            int maxColsFit = Math.Max(1, (screen.Width - 64 - pad * 2 + gap) / (cw + gap));
-            int rows = (int)Math.Ceiling((double)totalCards / maxColsFit);
-            _columnsPerRow = Math.Max(1, (int)Math.Ceiling((double)totalCards / rows));
+            // Always keep up to 9 cards in 1 clean horizontal row; shrink proportionally on narrower screens
+            int maxAvailW = Math.Max(200, screen.Width - 48);
+            int neededW = pad * 2 + totalCards * cw + (totalCards - 1) * gap;
+            if (neededW > maxAvailW)
+            {
+                cw = Math.Max((int)Math.Round(72 * DpiScale), (maxAvailW - pad * 2 - (totalCards - 1) * gap) / totalCards);
+                ch = Math.Max((int)Math.Round(44 * DpiScale), (int)Math.Round(cw * ((double)BASE_CARD_HEIGHT / BASE_CARD_WIDTH)));
+            }
+
+            _effectiveCardWidth = cw;
+            _effectiveCardHeight = ch;
+            _columnsPerRow = totalCards;
 
             int w = pad * 2 + _columnsPerRow * cw + (_columnsPerRow - 1) * gap;
-            int h = pad * 2 + rows * ch + (rows - 1) * gap;
+            int h = pad * 2 + ch;
             if (h > screen.Height - 40) h = screen.Height - 40;
 
             Size = new Size(w, h);
@@ -189,20 +204,28 @@ namespace WorkSpace
         {
             _altWatchdogTimer.Stop();
 
-            if (_config.Desktops.Count == 0) return;
+            _qsDesktops = _config.GetQuickSwitcherDesktops();
+            if (_qsDesktops.Count == 0) return;
 
-            int count = _config.Desktops.Count;
+            int count = _qsDesktops.Count;
+            string activeId = (_config.CurrentIndex >= 0 && _config.CurrentIndex < _config.Desktops.Count)
+                ? _config.Desktops[_config.CurrentIndex].Id
+                : "";
+            int curQsIdx = _qsDesktops.FindIndex(d => d.Id == activeId);
+
             if (advanceSelection)
             {
-                _selectedIndex = !_isSwitcherVisible
-                    ? (_config.CurrentIndex + 1) % count
-                    : (_selectedIndex + 1) % count;
+                if (!_isSwitcherVisible)
+                    _selectedIndex = curQsIdx >= 0 ? (curQsIdx + 1) % count : 0;
+                else
+                    _selectedIndex = (_selectedIndex + 1) % count;
             }
             else
             {
-                _selectedIndex = !_isSwitcherVisible
-                    ? (_config.CurrentIndex - 1 + count) % count
-                    : (_selectedIndex - 1 + count) % count;
+                if (!_isSwitcherVisible)
+                    _selectedIndex = curQsIdx >= 0 ? (curQsIdx - 1 + count) % count : count - 1;
+                else
+                    _selectedIndex = (_selectedIndex - 1 + count) % count;
             }
 
             // Fast-tap optimization: if user already released Alt before BeginInvoke arrived, switch immediately (zero 800ms lag!)
@@ -231,20 +254,20 @@ namespace WorkSpace
 
         public void HandleHookAction(int actionId)
         {
-            if (!_isSwitcherVisible || _config.Desktops.Count == 0) return;
+            if (!_isSwitcherVisible || _qsDesktops.Count == 0) return;
 
             switch (actionId)
             {
                 case KeyboardHook.ACTION_NAV_RIGHT:
-                    _selectedIndex = (_selectedIndex + 1) % _config.Desktops.Count;
+                    _selectedIndex = (_selectedIndex + 1) % _qsDesktops.Count;
                     Invalidate();
                     break;
                 case KeyboardHook.ACTION_NAV_LEFT:
-                    _selectedIndex = (_selectedIndex - 1 + _config.Desktops.Count) % _config.Desktops.Count;
+                    _selectedIndex = (_selectedIndex - 1 + _qsDesktops.Count) % _qsDesktops.Count;
                     Invalidate();
                     break;
                 case KeyboardHook.ACTION_NAV_DOWN:
-                    if (_selectedIndex + _columnsPerRow < _config.Desktops.Count)
+                    if (_selectedIndex + _columnsPerRow < _qsDesktops.Count)
                     {
                         _selectedIndex += _columnsPerRow;
                         Invalidate();
@@ -293,16 +316,21 @@ namespace WorkSpace
             _altWatchdogTimer.Stop();
             _isSwitcherVisible = false;
             if (Visible) Hide();
-            if (_selectedIndex >= 0 && _selectedIndex < _config.Desktops.Count)
+            if (_selectedIndex >= 0 && _selectedIndex < _qsDesktops.Count)
             {
-                _onSelectDesktop(_selectedIndex);
+                string targetId = _qsDesktops[_selectedIndex].Id;
+                int realIndex = _config.Desktops.FindIndex(d => d.Id == targetId);
+                if (realIndex >= 0)
+                {
+                    _onSelectDesktop(realIndex);
+                }
             }
         }
 
         protected override void OnMouseDown(MouseEventArgs e)
         {
             base.OnMouseDown(e);
-            for (int i = 0; i < _config.Desktops.Count; i++)
+            for (int i = 0; i < _qsDesktops.Count; i++)
             {
                 if (GetCardRect(i).Contains(e.Location))
                 {
@@ -318,9 +346,9 @@ namespace WorkSpace
             int cols = Math.Max(1, _columnsPerRow);
             int col = index % cols;
             int row = index / cols;
-            int x = Pad + col * (CardWidth + Gap);
-            int y = Pad + row * (CardHeight + Gap);
-            return new Rectangle(x, y, CardWidth, CardHeight);
+            int x = Pad + col * (_effectiveCardWidth + Gap);
+            int y = Pad + row * (_effectiveCardHeight + Gap);
+            return new Rectangle(x, y, _effectiveCardWidth, _effectiveCardHeight);
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -340,7 +368,7 @@ namespace WorkSpace
                 g.DrawPath(borderPen, path);
             }
 
-            for (int i = 0; i < _config.Desktops.Count; i++)
+            for (int i = 0; i < _qsDesktops.Count; i++)
             {
                 DrawDesktopCard(g, i, GetCardRect(i), i == _selectedIndex);
             }
@@ -384,7 +412,7 @@ namespace WorkSpace
 
         private void DrawDesktopCard(Graphics g, int index, Rectangle rect, bool isSelected)
         {
-            var d = _config.Desktops[index];
+            var d = _qsDesktops[index];
             float scale = DpiScale;
             int cardRadius = (int)Math.Round(10 * scale);
             int inset = (int)Math.Round(4 * scale);

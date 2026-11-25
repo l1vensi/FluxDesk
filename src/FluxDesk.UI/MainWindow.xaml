@@ -125,6 +125,9 @@
 
                             <!-- Normal Actions -->
                             <StackPanel x:Name="NormalDesktopActions" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                <Button x:Name="BtnConfigureQuickSwitcher" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,10,0" Click="BtnConfigureQuickSwitcher_Click">
+                                    <TextBlock x:Name="TxtBtnConfigureQs" Text="Alt + W (max 9)" FontSize="13"/>
+                                </Button>
                                 <Button x:Name="BtnEnterSelectMode" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,10,0" Click="BtnEnterSelectMode_Click">
                                     <TextBlock x:Name="TxtBtnSelectMode" Text="Select" FontSize="13"/>
                                 </Button>
@@ -423,7 +426,12 @@
                                             <TextBlock x:Name="TxtQuickSwitcherTitle" Text="Quick Switcher" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
                                             <TextBlock x:Name="TxtQuickSwitcherDesc" Text="Enable the quick switcher overlay for fast desktop switching" FontSize="12.5" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,4,0,0"/>
                                         </StackPanel>
-                                        <CheckBox x:Name="ChkQuickSwitcher" Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource ToggleSwitchStyle}" IsChecked="True" Click="ChkQuickSwitcher_Click"/>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Button x:Name="BtnConfigureQsSettings" Style="{StaticResource SecondaryButtonStyle}" Padding="12,6" Margin="0,0,12,0" Click="BtnConfigureQuickSwitcher_Click">
+                                                <TextBlock x:Name="TxtBtnConfigureQsSettings" Text="Customize (max 9)..." FontSize="12.5"/>
+                                            </Button>
+                                            <CheckBox x:Name="ChkQuickSwitcher" VerticalAlignment="Center" Style="{StaticResource ToggleSwitchStyle}" IsChecked="True" Click="ChkQuickSwitcher_Click"/>
+                                        </StackPanel>
                                     </Grid>
                                 </Border>
 
@@ -827,6 +835,116 @@
                             </Button>
                             <Button x:Name="BtnWeModalClose" Grid.Column="1" Height="34" Padding="20,0" Style="{StaticResource SecondaryButtonStyle}" Click="BtnWeModalClose_Click">
                                 <TextBlock x:Name="TxtWeModalClose" Text="Cancel" FontSize="12.5"/>
+                            </Button>
+                        </Grid>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!-- Modal Overlay for Quick Switcher (Alt + W) Visual Mini-Screen Configurator -->
+            <Grid x:Name="QsConfigModalOverlay" Grid.RowSpan="2" Background="#B8000000" Visibility="Collapsed" KeyboardNavigation.TabNavigation="Cycle">
+                <Border Background="{StaticResource CardBrush}"
+                        BorderBrush="{StaticResource AccentBorderBrush}"
+                        BorderThickness="1.5"
+                        CornerRadius="12"
+                        Width="880"
+                        MaxWidth="940"
+                        MaxHeight="680"
+                        VerticalAlignment="Center"
+                        HorizontalAlignment="Center"
+                        Padding="22">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Header -->
+                        <Grid Grid.Row="0" Margin="0,0,0,14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock x:Name="TxtQsModalTitle" Text="Quick Switcher Layout (Alt + W)" FontSize="17" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                <TextBlock x:Name="TxtQsModalSub" Text="Select up to 9 workspaces to display in the quick switcher overlay" FontSize="12.5" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,3,0,0"/>
+                            </StackPanel>
+                            <Border Grid.Column="1" Background="{StaticResource AccentTintBrush}" BorderBrush="{StaticResource AccentBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,6" VerticalAlignment="Center">
+                                <TextBlock x:Name="TxtQsCounter" Text="Selected: 0 / 9" FontSize="12.5" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}"/>
+                            </Border>
+                        </Grid>
+
+                        <!-- Mini-Screen Visual Monitor Preview -->
+                        <StackPanel Grid.Row="1" Margin="0,0,0,14">
+                            <Border Background="#0A0E14" BorderBrush="#2D3748" BorderThickness="3" CornerRadius="10" Height="205" ClipToBounds="True">
+                                <Grid>
+                                    <!-- Simulated Wallpaper Background -->
+                                    <Grid.Background>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                            <GradientStop Color="#0D1526" Offset="0"/>
+                                            <GradientStop Color="#14233C" Offset="0.5"/>
+                                            <GradientStop Color="#0B111C" Offset="1"/>
+                                        </LinearGradientBrush>
+                                    </Grid.Background>
+
+                                    <!-- Top-left mini screen badge -->
+                                    <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12,10,0,0" Background="#7A0D1117" CornerRadius="5" Padding="8,3">
+                                        <TextBlock x:Name="TxtQsMiniScreenBadge" Text="LIVE MONITOR PREVIEW" FontSize="10" FontWeight="Bold" Foreground="#9FB2C9"/>
+                                    </Border>
+
+                                    <!-- Simulated Alt+W Switcher Bar -->
+                                    <Border HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="16,0,16,32"
+                                            Background="#E81C1D22" BorderBrush="#41444E" BorderThickness="1.2" CornerRadius="10" Padding="8">
+                                        <StackPanel x:Name="QsMiniScreenCardsPanel" Orientation="Horizontal" HorizontalAlignment="Center"/>
+                                    </Border>
+
+                                    <!-- Simulated Windows Taskbar at bottom -->
+                                    <Border VerticalAlignment="Bottom" Height="22" Background="#D90F141D" BorderBrush="#222D3D" BorderThickness="0,1,0,0">
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <Border Width="10" Height="10" CornerRadius="2" Background="#38BDF8" Margin="3,0"/>
+                                            <Border Width="10" Height="10" CornerRadius="2" Background="#64748B" Margin="3,0"/>
+                                            <Border Width="10" Height="10" CornerRadius="2" Background="#64748B" Margin="3,0"/>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                            </Border>
+                            <!-- Monitor stand visual accent -->
+                            <Border Width="110" Height="5" Background="#253042" CornerRadius="0,0,4,4" HorizontalAlignment="Center"/>
+                            <Border Width="170" Height="3" Background="#1D2635" CornerRadius="2" HorizontalAlignment="Center" Margin="0,1,0,0"/>
+                        </StackPanel>
+
+                        <!-- Workspace Selection & Reordering List -->
+                        <Grid Grid.Row="2">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock x:Name="TxtQsLimitNotice" Text="Maximum 9 workspaces can be added to Alt + W." FontSize="12" FontWeight="SemiBold" Foreground="#F87171" Margin="0,0,0,6" Visibility="Collapsed"/>
+                            <Border Grid.Row="1" Background="#11141B" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="8" MinHeight="160" MaxHeight="240">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                    <StackPanel x:Name="QsConfigListPanel"/>
+                                </ScrollViewer>
+                            </Border>
+                        </Grid>
+
+                        <!-- Footer -->
+                        <Grid Grid.Row="3" Margin="0,14,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Button x:Name="BtnQsModalReset" Height="34" Padding="14,0" Style="{StaticResource SecondaryButtonStyle}" Click="BtnQsModalReset_Click">
+                                <TextBlock x:Name="TxtQsModalReset" Text="Reset (First 9)" FontSize="12.5"/>
+                            </Button>
+                            <Button x:Name="BtnQsModalCancel" Grid.Column="2" Height="34" Padding="18,0" Margin="0,0,10,0" Style="{StaticResource SecondaryButtonStyle}" Click="BtnQsModalCancel_Click">
+                                <TextBlock x:Name="TxtQsModalCancel" Text="Cancel" FontSize="12.5"/>
+                            </Button>
+                            <Button x:Name="BtnQsModalSave" Grid.Column="3" Height="34" Padding="20,0" Style="{StaticResource AccentButtonStyle}" Click="BtnQsModalSave_Click">
+                                <TextBlock x:Name="TxtQsModalSave" Text="Save" FontSize="12.5" FontWeight="Bold" Foreground="#0D1117"/>
                             </Button>
                         </Grid>
                     </Grid>

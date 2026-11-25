@@ -55,6 +55,8 @@ namespace WorkSpace
         public bool ContextMenuIntegration { get; set; } = false;
         public bool ShowTrayIcon { get; set; } = true;
         public bool QuickSwitcherEnabled { get; set; } = true;
+        public bool QuickSwitcherCustomSelection { get; set; } = false;
+        public List<string> QuickSwitcherDesktopIds { get; set; } = new List<string>();
         public bool ShowPreviewIcons { get; set; } = true;
         public bool WallpaperEngineEnabled { get; set; } = false;
         public string WallpaperEngineExe { get; set; } = "";
@@ -83,6 +85,32 @@ namespace WorkSpace
         );
 
         public static bool IsSafeId(string? id) => !string.IsNullOrWhiteSpace(id) && SafeIdRegex.IsMatch(id);
+
+        public List<DesktopInfo> GetQuickSwitcherDesktops()
+        {
+            var result = new List<DesktopInfo>();
+            if (QuickSwitcherCustomSelection)
+            {
+                foreach (var id in QuickSwitcherDesktopIds)
+                {
+                    var d = Desktops.FirstOrDefault(x => x.Id == id);
+                    if (d != null && !result.Contains(d))
+                    {
+                        result.Add(d);
+                        if (result.Count >= 9) break;
+                    }
+                }
+            }
+            else
+            {
+                foreach (var d in Desktops)
+                {
+                    result.Add(d);
+                    if (result.Count >= 9) break;
+                }
+            }
+            return result;
+        }
 
         public static string GetExecutableDirectory()
         {
