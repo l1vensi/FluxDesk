@@ -607,23 +607,22 @@
 
                         <!-- Mini-Screen Visual Monitor Preview -->
                         <StackPanel Grid.Row="1" Margin="0,0,0,16">
-                            <Border Background="#0A0E14" BorderBrush="#263142" BorderThickness="2" CornerRadius="10" Height="195" ClipToBounds="True">
+                            <Border BorderBrush="#263142" BorderThickness="2" CornerRadius="10" Height="195">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                        <GradientStop Color="#0D1526" Offset="0"/>
+                                        <GradientStop Color="#14233C" Offset="0.5"/>
+                                        <GradientStop Color="#0B111C" Offset="1"/>
+                                    </LinearGradientBrush>
+                                </Border.Background>
                                 <Grid>
-                                    <Grid.Background>
-                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                                            <GradientStop Color="#0D1526" Offset="0"/>
-                                            <GradientStop Color="#14233C" Offset="0.5"/>
-                                            <GradientStop Color="#0B111C" Offset="1"/>
-                                        </LinearGradientBrush>
-                                    </Grid.Background>
-
                                     <Viewbox Stretch="Uniform" StretchDirection="DownOnly" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="18,12,18,30">
                                         <Border Background="#E81C1D22" BorderBrush="#41444E" BorderThickness="1.2" CornerRadius="10" Padding="8">
                                             <StackPanel x:Name="QsMiniScreenCardsPanel" Orientation="Horizontal" HorizontalAlignment="Center"/>
                                         </Border>
                                     </Viewbox>
 
-                                    <Border VerticalAlignment="Bottom" Height="22" Background="#D90F141D" BorderBrush="#222D3D" BorderThickness="0,1,0,0">
+                                    <Border VerticalAlignment="Bottom" Height="22" Background="#D90F141D" BorderBrush="#222D3D" BorderThickness="0,1,0,0" CornerRadius="0,0,8,8">
                                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                                             <Border Width="10" Height="10" CornerRadius="2" Background="#38BDF8" Margin="3,0"/>
                                             <Border Width="10" Height="10" CornerRadius="2" Background="#64748B" Margin="3,0"/>

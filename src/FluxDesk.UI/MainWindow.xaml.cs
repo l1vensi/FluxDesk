@@ -4315,6 +4315,7 @@ namespace DeskSpace
                 {
                     VerticalAlignment = VerticalAlignment.Bottom,
                     Background = new SolidColorBrush(Color.FromArgb(210, 13, 17, 23)),
+                    CornerRadius = new CornerRadius(0, 0, 5, 5),
                     Padding = new Thickness(5, 2.5, 5, 2.5),
                     Child = labelText
                 };
@@ -4323,21 +4324,40 @@ namespace DeskSpace
 
                 var btnRemove = new Button
                 {
-                    Content = "x",
                     Width = 18,
                     Height = 18,
-                    Padding = new Thickness(0),
-                    FontSize = 10,
-                    FontWeight = FontWeights.Bold,
-                    Foreground = new SolidColorBrush(Color.FromRgb(248, 113, 113)),
-                    Background = new SolidColorBrush(Color.FromArgb(225, 15, 20, 30)),
-                    BorderThickness = new Thickness(0),
                     HorizontalAlignment = HorizontalAlignment.Right,
                     VerticalAlignment = VerticalAlignment.Top,
-                    Margin = new Thickness(0, 3, 3, 0),
+                    Margin = new Thickness(0, 4, 4, 0),
                     Cursor = Cursors.Hand,
+                    FocusVisualStyle = null,
                     Visibility = Visibility.Collapsed
                 };
+                var rmTemplate = new ControlTemplate(typeof(Button));
+                var rmBd = new FrameworkElementFactory(typeof(Border));
+                rmBd.Name = "rmBd";
+                rmBd.SetValue(Border.CornerRadiusProperty, new CornerRadius(9));
+                rmBd.SetValue(Border.BackgroundProperty, new SolidColorBrush(Color.FromArgb(220, 15, 20, 30)));
+                rmBd.SetValue(Border.BorderBrushProperty, new SolidColorBrush(Color.FromArgb(140, 255, 255, 255)));
+                rmBd.SetValue(Border.BorderThicknessProperty, new Thickness(0.8));
+                var rmPath = new FrameworkElementFactory(typeof(System.Windows.Shapes.Path));
+                rmPath.Name = "rmPath";
+                rmPath.SetValue(System.Windows.Shapes.Path.DataProperty, (Geometry)FindResource("IconClose"));
+                rmPath.SetValue(System.Windows.Shapes.Path.FillProperty, new SolidColorBrush(Color.FromRgb(226, 232, 240)));
+                rmPath.SetValue(System.Windows.Shapes.Path.WidthProperty, 7.0);
+                rmPath.SetValue(System.Windows.Shapes.Path.HeightProperty, 7.0);
+                rmPath.SetValue(System.Windows.Shapes.Path.StretchProperty, Stretch.Uniform);
+                rmPath.SetValue(HorizontalAlignmentProperty, HorizontalAlignment.Center);
+                rmPath.SetValue(VerticalAlignmentProperty, VerticalAlignment.Center);
+                rmBd.AppendChild(rmPath);
+                rmTemplate.VisualTree = rmBd;
+
+                var rmHoverTrigger = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
+                rmHoverTrigger.Setters.Add(new Setter(Border.BackgroundProperty, new SolidColorBrush(Color.FromRgb(220, 38, 38)), "rmBd"));
+                rmHoverTrigger.Setters.Add(new Setter(Border.BorderBrushProperty, new SolidColorBrush(Color.FromRgb(239, 68, 68)), "rmBd"));
+                rmHoverTrigger.Setters.Add(new Setter(System.Windows.Shapes.Path.FillProperty, Brushes.White, "rmPath"));
+                rmTemplate.Triggers.Add(rmHoverTrigger);
+                btnRemove.Template = rmTemplate;
                 string capId = d.Id;
                 btnRemove.Click += (s, ev) =>
                 {
